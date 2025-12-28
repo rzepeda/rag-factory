@@ -1,0 +1,1 @@
+# Local cosine similarity (no external dependencies)

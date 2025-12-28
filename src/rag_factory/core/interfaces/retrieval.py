@@ -1,0 +1,1 @@
+# IRetrievalStrategy interface

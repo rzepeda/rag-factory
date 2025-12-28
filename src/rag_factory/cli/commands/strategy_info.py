@@ -1,0 +1,1 @@
+# Show strategy information

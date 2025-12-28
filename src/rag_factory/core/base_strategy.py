@@ -1,0 +1,1 @@
+# BaseStrategy with service validation

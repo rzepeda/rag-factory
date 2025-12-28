@@ -1,0 +1,1 @@
+# SemanticVector entity (dataclass)

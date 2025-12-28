@@ -1,0 +1,1 @@
+# pgvector, uuid-ossp extensions

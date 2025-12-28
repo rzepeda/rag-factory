@@ -1,0 +1,1 @@
+# IEmbeddingService interface

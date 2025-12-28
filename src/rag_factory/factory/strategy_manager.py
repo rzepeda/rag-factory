@@ -1,0 +1,1 @@
+# StrategyPairManager - load strategy pairs

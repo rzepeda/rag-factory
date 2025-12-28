@@ -1,0 +1,1 @@
+# IIndexingStrategy interface

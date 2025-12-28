@@ -1,0 +1,4 @@
+# CLI configuration for quick start
+strategy_pair: semantic-local-pair
+service_registry: config/services.yaml
+alembic_config: alembic.ini

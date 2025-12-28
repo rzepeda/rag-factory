@@ -1,0 +1,1 @@
+# Validate embeddings command

@@ -1,0 +1,1 @@
+# IGraphService interface

@@ -1,0 +1,1 @@
+# Generate migration from template

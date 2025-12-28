@@ -1,0 +1,1 @@
+# KnowledgeGraphIndexer implementation

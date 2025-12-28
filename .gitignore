@@ -1,0 +1,60 @@
+# --- Python Core ---
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# --- Environments ---
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# --- Database ---
+*.db
+*.sqlite3
+
+# --- IDEs ---
+.vscode/
+.idea/
+*.swp
+*.ds_store
+
+# --- Agent Sandbox ---
+workspace/
+logs/
+*.log
+
+# --- RAG Factory Specific ---
+# Models and caches
+models/
+*.onnx
+.embedding_cache/
+
+# Configuration (keep examples)
+.env
+config/services.yaml
+
+# Sample data
+sample-docs/
+test-data/
+
+# Generated migrations (keep templates)
+migrations/versions/*
+!migrations/versions/shared/
+!migrations/versions/shared/000_create_extensions.py
+
+# Agent workspace
+workspace/
+*.log
+logs/
+
+# Performance profiling results
+*.prof
+*.pstats

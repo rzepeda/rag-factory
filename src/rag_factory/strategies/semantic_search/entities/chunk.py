@@ -1,0 +1,1 @@
+# SemanticChunk entity (dataclass)
