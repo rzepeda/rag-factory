@@ -86,3 +86,18 @@ def validate_storage_mapping(model: LogicalModel, mapping: StorageMapping) -> No
     missing_ops = model.required_operations.difference(mapping.operations)
     if missing_ops:
         raise ValueError(f"Missing storage operations: {', '.join(sorted(missing_ops))}")
+
+def validate_operational_support(
+    model: LogicalModel, mapping: StorageMapping, provider_operations: FrozenSet[str]
+) -> None:
+    """Require declared mapping coverage and actual adapter-advertised operations.
+
+    This is metadata validation only; it does not introspect a physical database.
+    """
+    validate_storage_mapping(model, mapping)
+    unsupported = model.required_operations.difference(provider_operations)
+    if unsupported:
+        raise ValueError(
+            "Provider does not support storage operations: "
+            + ", ".join(sorted(unsupported))
+        )
