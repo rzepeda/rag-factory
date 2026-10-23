@@ -92,7 +92,12 @@ def test_all_twelve_strategy_families():
             assert pipeline.index(name, payload).artifact_id
         for name in ("keyword", "semantic", "contextual", "hierarchy", "graph", "late", "rerank", "multi", "expand", "reflect", "hybrid"):
             query = "node" if name == "graph" else "cat"
-            assert isinstance(pipeline.retrieve(name, query), list)
+            results = pipeline.retrieve(name, query)
+            assert results
+            assert all(isinstance(hit, RetrievalHit) for hit in results)
+        assert pipeline.retrieve("contextual", "cat")[0] == RetrievalHit("ctx", "cat")
+        assert pipeline.retrieve("hierarchy", "cat")[0] == RetrievalHit("parent", "cat parent")
+        assert pipeline.retrieve("graph", "node")[0] == RetrievalHit("node", "cat")
         pipeline._instances["llm"].response = "keyword"
         assert pipeline.retrieve("agent", "cat")
     with pytest.raises(RuntimeError, match="closed"):
