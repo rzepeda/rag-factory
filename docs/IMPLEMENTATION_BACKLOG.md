@@ -31,3 +31,16 @@ New runtime slice: `factory/runtime.py` and `factory/runtime_config.py` build an
 The opt-in `factory/unified.py` and `factory/unified_config.py` cover all 12 strategy families with independent indexing and retrieval bindings per named strategy. Retrieval outputs are normalized into `RetrievalHit(document_id, text=None)`; composite dependencies are checked for missing references and cycles. Services are validated before construction, shared by instance name and closed on exit or failed construction. Manifest attachment validates the entire supplied batch before mutation. The offline tests `test_unified_all_strategies.py` exercise all 12 kinds and YAML stage bindings, as well as cleanup and negative contract cases. See `docs/UNIFIED_FACTORY.md`.
 
 **Next refinements, still possible offline:** durable relationship metadata for hierarchy, configuration-specific artifact identity and reuse checks, richer per-stage plan/config validation, adapter conformance fixtures, structured error reporting, and realistic end-to-end datasets. This is a separate opt-in API; the prior keyword/semantic runtime remains available.
+
+
+## ragTools algorithm parity (2026-10-23)
+
+Implemented new offline components in `dev`:
+
+- `strategies/chunking/semantic.py`: sentence-boundary semantic chunking with injected embeddings, threshold and maximum-sentence limits; available as `semantic_chunking` indexing/retrieval kind in the unified factory.
+- `strategies/query_expansion/hyde.py`: hypothetical-document expansion over an allowlisted source strategy; configured as `hyde` in the unified factory.
+- `strategies/knowledge_graph/extraction.py`: explicit JSON link extraction from an injected LLM, allowlisting existing document IDs; separate `ExtractedGraphIndexer` composes it with the existing graph indexer. This is **document-link extraction**, not an ontology/entity database.
+- `strategies/knowledge_graph/hybrid.py`: graph/vector reciprocal-rank fusion; configured as `graph_vector_hybrid` using two existing source strategies.
+- `services/{document,graph,vector}/memory.py`: offline adapters, registered in the default service registry.
+
+Remaining parity enhancements: first-class LLM entity extraction and typed knowledge graphs, self-reflective query refinement, richer agentic planning, HyDE embedding-specific transformations, distinct reranking implementations, production-grade chunk token alignment, fine-tuned model loading, evaluation benchmarks, and external providers. No real model or database services are provisioned.
