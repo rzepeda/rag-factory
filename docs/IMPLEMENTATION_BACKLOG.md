@@ -44,3 +44,5 @@ Implemented new offline components in `dev`:
 - `services/{document,graph,vector}/memory.py`: offline adapters, registered in the default service registry.
 
 Remaining parity enhancements: first-class LLM entity extraction and typed knowledge graphs, self-reflective query refinement, richer agentic planning, HyDE embedding-specific transformations, distinct reranking implementations, production-grade chunk token alignment, fine-tuned model loading, evaluation benchmarks, and external providers. No real model or database services are provisioned.
+
+An additional opt-in `query_refinement` retriever now performs bounded LLM rewriting after empty retrieval, without changing the default `self_reflective` grading algorithm. Existing query-refinement behavior is deliberately a separate composable strategy, not a full Self-RAG reasoning loop.
