@@ -119,3 +119,15 @@ The following provider-independent Python modules now exist on `dev`:
 Unit tests: `tests/unit/core/test_service_and_mapping_contracts.py`.
 
 **Scope limitations:** these are declarative contracts, not a provider registry/factory, physical database schema introspection, executable pipelines or verified environment checks. Index manifest validation compares explicitly declared fields; it does not yet validate all provider-specific semantics or permissions. Existing `core/capabilities.py` and historical interface placeholders remain for incremental migration; do not conflate its legacy index capabilities with new provider service capabilities. Tests were written but have not been executed in this GitHub editing session.
+
+
+## First configuration-driven keyword factory slice (2026-10-23)
+
+Implemented under `factory/service_registry.py` and `factory/rag_factory.py`:
+- Explicit registration of provider descriptors and constructors.
+- Named `ServiceConfig` instances, explicit interface-to-instance bindings and declared-capability checks.
+- A keyword pipeline builder using injected provider-neutral interfaces.
+- Two infrastructure-free production examples: `services/keyword/memory.py` and `services/tokenizer/regex.py`; test mocks remain under `tests/mocks/`.
+- Tests in `tests/unit/core/test_factory_keyword.py` exercise swapping providers using configuration without changing strategy code, and invalid configurations.
+
+**Limitations:** this slice uses Python configuration objects, not a YAML loader; it does not yet support external provider adapters, physical mapping validation during factory construction, index manifests emitted from indexing, generic strategy registration, lifecycle/cleanup hooks or preflight checks. The in-memory ranking is simple token frequency matching, not BM25. Factory construction currently resolves configured instances before all requirements have been validated; future work should validate metadata first and manage rollback/cleanup of partially created instances.
