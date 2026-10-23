@@ -10,6 +10,7 @@ RAG Factory is a **configuration-driven framework for constructing, validating, 
 - [Project structure](docs/PROJECT_STRUCTURE.md) — current vs target layout.
 - [Superseded concepts](docs/architecture/DEPRECATIONS.md) — migration guidance and deprecated assumptions.
 - [Architecture decision records](docs/architecture/decisions/README.md).
+- [Testing standard](docs/standards/TESTING.md) — how tests are written, isolated and run in CI.
 
 When older documents, examples or scaffolds conflict, follow the canonical architecture document. Do not implement placeholder descriptions as product requirements.
 
