@@ -31,6 +31,7 @@ from rag_factory.strategies.agentic_rag.retriever import AgenticRAGRetriever
 from rag_factory.pipelines.retrieval import RetrievalPipeline, RetrievalSource
 from rag_factory.strategies.hybrid_search.retriever import HybridRetriever
 from rag_factory.strategies.query_expansion.hyde import HyDERetriever
+from rag_factory.strategies.self_reflective.refinement import QueryRefinementRetriever
 from rag_factory.strategies.chunking.semantic import SemanticBoundaryChunker
 from rag_factory.strategies.knowledge_graph.hybrid import GraphVectorHybridRetriever
 
@@ -71,12 +72,13 @@ REQUIRES: dict[str, dict[str, tuple[ServiceRequirement, ...]]] = {
     "agentic": {"indexing": (), "retrieval": (ServiceRequirement("llm", frozenset({"generate"})),)},
     "hybrid": {"indexing": (), "retrieval": ()},
     "semantic_chunking": {"indexing": (ServiceRequirement("embedding", frozenset({"embed"})), ServiceRequirement("vector_store", frozenset({"upsert"}))), "retrieval": (ServiceRequirement("embedding", frozenset({"embed"})), ServiceRequirement("vector_store", frozenset({"search"})))},
+    "query_refinement": {"indexing": (), "retrieval": (ServiceRequirement("llm", frozenset({"generate"})),)},
     "hyde": {"indexing": (), "retrieval": (ServiceRequirement("llm", frozenset({"generate"})),)},
     "graph_vector_hybrid": {"indexing": (), "retrieval": ()},
 }
 INDEXED = frozenset({"keyword", "semantic", "semantic_chunking", "contextual", "hierarchical",
                       "knowledge_graph", "late_chunking"})
-REFERENCED = frozenset({"reranking", "multi_query", "query_expansion", "self_reflective", "hyde"})
+REFERENCED = frozenset({"reranking", "multi_query", "query_expansion", "self_reflective", "hyde", "query_refinement"})
 COMPOSITES = REFERENCED | {"agentic", "hybrid", "graph_vector_hybrid"}
 
 
@@ -323,6 +325,9 @@ class UnifiedPipeline:
             result = SelfReflectiveRetriever(
                 source, get("document_store"), RelevanceGrader(get("llm")),
                 params.get("max_attempts", 2)).retrieve(query, limit)
+        elif kind == "query_refinement":
+            result = QueryRefinementRetriever(get("llm"), source,
+                params.get("max_rewrites", 2)).retrieve(query, limit)
         elif kind == "hyde":
             result = HyDERetriever(get("llm"), source).retrieve(query, limit)
         elif kind == "graph_vector_hybrid":
