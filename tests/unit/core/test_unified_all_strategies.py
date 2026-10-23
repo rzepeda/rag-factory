@@ -136,3 +136,64 @@ def test_rejects_cycles_unknown_references_and_bad_shapes():
     ]
     with pytest.raises(TypeError):
         normalize_hits([42])
+
+
+def test_missing_stage_binding_is_clear_and_creates_nothing():
+    registry = ServiceRegistry()
+    constructed = []
+    registry.register(
+        ProviderDescriptor("keyword_store", "mock", frozenset({"upsert", "search"})),
+        lambda: constructed.append(1) or MockKeywordStore(),
+    )
+    cfg = UnifiedConfiguration(
+        {"store": ServiceConfig("keyword_store", "mock")},
+        {"a": StrategySpec("keyword", {"keyword_store": "store"}, {})},
+    )
+    with pytest.raises(ValueError, match="Missing configured service"):
+        build_unified(cfg, registry)
+    assert constructed == []
+
+
+def test_constructor_failure_closes_previous_owned_service():
+    registry = ServiceRegistry()
+    closed = []
+    class ClosableStore(MockKeywordStore):
+        def close(self):
+            closed.append("closed")
+    registry.register(
+        ProviderDescriptor("keyword_store", "mock", frozenset({"upsert", "search"})),
+        ClosableStore,
+    )
+    def fails():
+        raise RuntimeError("constructor failed")
+    registry.register(
+        ProviderDescriptor("tokenizer", "mock", frozenset({"tokenize"})), fails
+    )
+    config = UnifiedConfiguration(
+        {"store": ServiceConfig("keyword_store", "mock"),
+         "tokens": ServiceConfig("tokenizer", "mock")},
+        {"keyword": StrategySpec(
+            "keyword", {"keyword_store": "store"},
+            {"keyword_store": "store", "tokenizer": "tokens"},
+        )},
+    )
+    with pytest.raises(RuntimeError, match="constructor failed"):
+        build_unified(config, registry)
+    assert closed == ["closed"]
+
+
+def test_failed_artifact_handoff_is_atomic():
+    from rag_factory.core.index_manifest import IndexManifest
+    registry, services = setup()
+    cfg = UnifiedConfiguration(services, {
+        "a": spec("keyword", ["keyword_store"], ["keyword_store", "tokenizer"]),
+        "b": spec("semantic", ["embedding", "vector_store"],
+                  ["embedding", "vector_store"], embedding_model="expected"),
+    })
+    with build_unified(cfg, registry) as pipeline:
+        valid = IndexManifest("a", frozenset({"keywords"}), "1")
+        invalid = IndexManifest("b", frozenset({"vectors"}), "1",
+                                embedding_model="different", embedding_dimensions=2)
+        with pytest.raises(ValueError, match="embedding_model"):
+            pipeline.attach_artifacts({"a": valid, "b": invalid})
+        assert pipeline._artifacts == {}
