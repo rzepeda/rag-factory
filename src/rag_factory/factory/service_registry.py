@@ -38,6 +38,10 @@ def default_registry() -> ServiceRegistry:
     from rag_factory.services.keyword.memory import MemoryKeywordStore
     from rag_factory.services.tokenizer.regex import RegexTokenizer
 
+    from rag_factory.services.document.memory import MemoryDocumentStore
+    from rag_factory.services.graph.memory import MemoryGraphStore
+    from rag_factory.services.vector.memory import MemoryVectorStore
+
     registry = ServiceRegistry()
     registry.register(
         ProviderDescriptor("keyword_store", "memory", frozenset({"upsert", "search"})),
@@ -46,5 +50,17 @@ def default_registry() -> ServiceRegistry:
     registry.register(
         ProviderDescriptor("tokenizer", "regex", frozenset({"tokenize"})),
         RegexTokenizer,
+    )
+    registry.register(
+        ProviderDescriptor("document_store", "memory", frozenset({"upsert", "get"})),
+        MemoryDocumentStore,
+    )
+    registry.register(
+        ProviderDescriptor("graph_store", "memory", frozenset({"add_edge", "neighbors"})),
+        MemoryGraphStore,
+    )
+    registry.register(
+        ProviderDescriptor("vector_store", "memory", frozenset({"upsert", "search"})),
+        MemoryVectorStore,
     )
     return registry
