@@ -1,48 +1,58 @@
-# RAG Factory architecture — initial decision record
+# RAG Factory — canonical architecture
 
-Status: accepted as implementation direction (2026-10-23).
+**Status:** Accepted target architecture, October 23, 2026. **Implementation status:** early scaffolding plus initial contracts; not a released or end-to-end tested framework.
 
-## Purpose
+This document is **normative** for new work on `dev`. See [deprecations](DEPRECATIONS.md) for superseded designs and [project structure](../PROJECT_STRUCTURE.md) for placement. Examples below are proposed interfaces/configuration, **not runnable APIs**.
 
-RAG Factory constructs, validates, executes and benchmarks composable RAG indexing and retrieval pipelines with interchangeable service implementations. The framework does not provision databases or model servers.
+## Objective
 
-## Boundaries
+Construct, validate, execute and benchmark **composable indexing and retrieval pipelines** with interchangeable, configuration-selected service adapters and externally managed infrastructure. Support many implementations of one strategy, many retrieval strategies over compatible indexes, and reproducible choices for accuracy, latency, cost and resources.
 
-1. **Strategy**: indexing or retrieval behavior, required service capabilities, logical entities and persistence operations. Indexing and retrieval requirements are declared separately.
-2. **Service interface**: provider-neutral operations (LLM, tokenizer, embeddings, keyword store, vector store, database, etc.).
-3. **Service adapter**: code that implements an interface for a provider. Defined once, reusable across strategies.
-4. **Service configuration**: named provider instance, endpoint/credentials references, model choices, and logical-to-physical model mappings.
-5. **Factory**: resolves providers, validates requirements and mappings, creates adapters, and manages owned connections.
-6. **Pipeline**: composes strategy operations; indexing can run independently of retrieval.
-7. **Index manifest**: describes produced artifacts (schema, model/version, embedding space, analyzers, physical locations) for compatibility checking.
-8. **Evaluation**: reproducible comparisons of valid strategy/provider configurations including quality, latency, cost and indexing expense.
+## Concepts and ownership
 
-## Persistence rules
+- **Strategy:** algorithmic behavior, indexing and/or retrieval requirements, logical data model (when needed), relationships and required data operations. No provider imports or physical table names.
+- **Service interface:** provider-neutral behavioral contract defined once per capability family (LLM, tokenizer, embedding, vector search, keyword search, graph, persistence, reranking).
+- **Provider implementation/adapter:** code implementing a service interface. Shared across strategies; provider-specific logic stays here.
+- **Service configuration:** named implementation instances with model/endpoint/credential references, tuning, and logical-to-physical **entity/field/relationship/operation mappings** where a model is needed.
+- **Factory:** registers providers, resolves requirements against declared capabilities, verifies mappings and index compatibility, constructs adapters, injects them, manages owned client connections.
+- **Pipeline:** explicitly composed indexing or retrieval steps/strategies, without assuming both sides use the same strategy. Start with sequential execution; allow parallel branches and bounded agent loops once required.
+- **Index artifact/manifest:** persisted description of what indexing created, including resource references, schema/model versions, analyzer/preprocessing, embedding identity/dimension/metric, and access rights.
+- **Experiment:** controlled execution and comparison across valid strategy/provider/configurations; records corpus/query sets, metrics, environment, index versions, costs and reproducible settings.
 
-The strategy defines logical entities, fields, relationships and required operations, **not physical table names**.
-The configured provider binds logical entities and fields to externally managed tables, collections, properties and indexes.
-Mapping compatibility checks **both structural fields and required operations**. A matching column alone does not prove keyword or vector search is supported.
-Schema validation is separate from migration; strategy instantiation must not silently create/alter storage.
+A **capability** is an operation a service offers, not a concrete provider or infrastructure deployment. Separately, an **index capability** describes what a produced artifact supports. Don't mix these namespaces. A single PostgreSQL deployment may provide relational, keyword and vector operations through one or more interface adapters.
 
-## Service lifecycle
+## Indexing and retrieval independence
 
-The framework owns adapter instances/connections it constructs, not the databases, model deployments or other infrastructure behind them. Reuse a service instance only when its configuration and safety/lifetime constraints permit it. Allow an in-memory backend as an explicit provider.
+Each strategy declares requirements separately per phase. Some retrieval strategies (such as multi-query or agentic tool selection) consume pre-existing indexes and need no special indexing path. Retrieval can use artifacts produced by another strategy if compatible. Verify more than the index's feature labels: embedding model identity/revision, dimension, normalization/metric, analyzers/tokenizers, schema, field mappings, operation semantics and permissions.
 
-## Delivery order
+If a strategy needs persistent data, it declares **logical entities and operations**. The service configuration maps them onto physical tables, collections, fields, relations and search indexes in existing infrastructure. The provider validates **structural and operational compatibility**. A matching column doesn't imply support for a requested ranking/search operation. Share logical models only when their semantics match.
 
-1. Establish contracts, mapping schema, packaging and unit tests.
-2. Complete keyword indexing/retrieval with an in-memory provider.
-3. Configure a second keyword provider (e.g. external PostgreSQL FTS) without modifying strategy code.
-4. Add semantic retrieval and index manifests, then cross-strategy and hybrid retrieval.
-5. Implement experimental runs with reproducible measurements and artifact reuse.
+## Separation of source, configuration and infrastructure
 
-Avoid introducing mandatory relational ORM models, automatic migrations, a universal DAG executor or an agent framework before the corresponding use case demands them.
+**Inside repository:** interfaces, provider adapters, algorithms, validators, factory, pipelines, experiments and safe example configuration. **Configuration:** instance names, provider identifiers, URL/DSN references, model IDs and logical-to-physical mappings. **Outside runtime ownership:** database installations, model servers, model assets, cloud deployments. Explicit in-process local/in-memory providers are allowed.
 
-## Example configuration (proposed; not yet executable)
+Factory construction must not silently download a model, start a server, create a database, or migrate a schema. Separate read-only validation from explicit admin/migration commands. Adapters/connections may be shared when configuration, thread safety and lifecycle are compatible; sharing one provider implementation does **not** imply sharing an instance.
+
+## Target ownership layout
+
+```text
+src/rag_factory/
+  core/             # capability, mapping and artifact contracts
+  services/         # interfaces and adapters shared across strategies
+  strategies/       # per-phase requirements, algorithm code and logical models
+  factory/          # registry, config resolver, validation, lifecycle
+  pipelines/        # indexing/retrieval composition and execution
+  evaluation/       # datasets, metrics, experiment runs and comparison
+  cli/              # optional external-facing adapter
+```
+
+Existing `shared/services`, schema generation, migrations, and agent tooling remain in the tree until explicit refactoring. The layout is a target, not current implementation status. A mandatory extra `components/` or `processors/` layer is **not** part of the design.
+
+## Proposed example (not yet executable)
 
 ```yaml
 services:
-  keyword_store_main:
+  keyword_main:
     interface: keyword_store
     implementation: postgres_fts
     connection:
@@ -50,27 +60,47 @@ services:
     mapping:
       Document:
         table: documents
-        fields:
-          id: document_id
-          content: body
+        fields: {id: document_id, content: body}
       Chunk:
         table: chunks
-        fields:
-          id: chunk_id
-          document_id: document_fk
-          content: chunk_text
+        fields: {id: chunk_id, document_id: document_fk, content: chunk_text}
     search:
       language: english
       ranking: ts_rank_cd
 pipelines:
-  index:
+  indexing:
     strategy: keyword
-    services:
-      keyword_store: keyword_store_main
-  retrieve:
+    services: {keyword_store: keyword_main}
+  retrieval:
     strategy: keyword
-    services:
-      keyword_store: keyword_store_main
+    services: {keyword_store: keyword_main}
 ```
 
-No secrets or infrastructure state belong in repository configuration.
+Provider-specific mappings may include relations, types, indexes and query configuration. Mappings are declarations, not schema creation instructions.
+
+## Validation levels
+
+1. **Contract:** provider conforms to interface and implements declared operation capabilities.
+2. **Configuration:** required endpoint/model/credentials references and mapping fields are supplied (without exposing secrets).
+3. **Environment:** optional preflight tests that external services are reachable and support advertised operations.
+4. **Artifact compatibility:** indexed data and retriever agree on model/schema/analyzer/metric semantics and permissions.
+5. **Execution:** errors are explicit, with cleanup and reproducible provenance.
+
+## Testing and evaluation
+
+- Unit: algorithms and contracts without a running database/model.
+- Adapter contract: at least two providers satisfy one interface.
+- Integration: externally provisioned services used only with explicit test setup.
+- Cross-strategy: one compatible index used by multiple retrievers without forced reindexing.
+- Benchmark: fixed datasets and relevance judgments; measure recall/nDCG, p50/p95 latency, indexing cost, query cost, throughput and infrastructure/model versions; don't compare runs without provenance.
+
+## Incremental delivery
+
+1. Update docs, packaging, contracts and tests.
+2. Implement keyword indexing/retrieval with a local in-memory implementation.
+3. Switch to a separately configured PostgreSQL FTS provider without altering the strategy.
+4. Add semantic indexes, manifests and cross-strategy/hybrid retrieval.
+5. Add reproducible experiment orchestration.
+6. Expand to contextual, hierarchical, graph and agentic workflows as interfaces prove adequate.
+
+Architectural decisions must be revised in this document before changing their boundaries in implementation.
