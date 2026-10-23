@@ -15,6 +15,9 @@ class IndexManifest:
     embedding_dimensions: Optional[int] = None
     distance_metric: Optional[str] = None
     analyzer: Optional[str] = None
+    embedding_revision: Optional[str] = None
+    resource_locator: Optional[str] = None
+    access_scope: Optional[str] = None
 
     def __post_init__(self) -> None:
         if not self.artifact_id.strip() or not self.schema_version.strip():
@@ -23,6 +26,10 @@ class IndexManifest:
             raise ValueError("Embedding dimensions must be positive")
         if self.embedding_dimensions is not None and not self.embedding_model:
             raise ValueError("Embedding model must be provided with dimensions")
+        for name in ("embedding_revision", "resource_locator", "access_scope"):
+            value = getattr(self, name)
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                raise ValueError(f"{name} must be a nonempty string")
 
 
 @dataclass(frozen=True)
@@ -33,6 +40,9 @@ class IndexRequirement:
     embedding_dimensions: Optional[int] = None
     distance_metric: Optional[str] = None
     analyzer: Optional[str] = None
+    embedding_revision: Optional[str] = None
+    resource_locator: Optional[str] = None
+    access_scope: Optional[str] = None
 
 
 def validate_index_compatibility(
@@ -44,7 +54,8 @@ def validate_index_compatibility(
         raise ValueError(f"Missing index capabilities: {', '.join(sorted(missing))}")
     for attribute in (
         "schema_version", "embedding_model", "embedding_dimensions",
-        "distance_metric", "analyzer",
+        "distance_metric", "analyzer", "embedding_revision",
+        "resource_locator", "access_scope",
     ):
         expected = getattr(requirement, attribute)
         if expected is not None and getattr(artifact, attribute) != expected:
