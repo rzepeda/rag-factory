@@ -16,7 +16,8 @@ def test_compare_strategies_with_shared_relevance_judgments():
     )
     baseline, expanded = results
     assert baseline.queries == 2
-    assert baseline.recall_at_k == 0.5\n    assert expanded.recall_at_k == 1.0
+    assert baseline.recall_at_k == 0.5
+    assert expanded.recall_at_k == 1.0
     assert expanded.mean_reciprocal_rank_at_k > baseline.mean_reciprocal_rank_at_k
 
 
