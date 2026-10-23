@@ -148,8 +148,16 @@ class UnifiedPipeline:
         ))
 
     def _validate(self, registry):
-        descriptors = {name: registry.descriptor(self.config.services[name])
-                       for name in self._service_names() if name in self.config.services}
+        used_names = {
+            binding.get(req.interface)
+            for spec in self.config.strategies.values()
+            for stage, binding in (("indexing", spec.indexing), ("retrieval", spec.retrieval))
+            for req in REQUIRES[spec.kind][stage]
+        }
+        descriptors = {
+            name: registry.descriptor(self.config.services[name])
+            for name in used_names if name is not None and name in self.config.services
+        }
         for name, spec in self.config.strategies.items():
             for stage, bindings in (("indexing", spec.indexing), ("retrieval", spec.retrieval)):
                 validate_service_bindings(REQUIRES[spec.kind][stage], bindings, descriptors)
