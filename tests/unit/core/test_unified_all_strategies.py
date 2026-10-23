@@ -60,7 +60,26 @@ def test_all_twelve_strategy_families():
         "agent": spec("agentic", retrieval=["llm"], sources=["keyword"]),
         "hybrid": spec("hybrid", sources=["keyword", "semantic"]),
     }
+    # Strategy-specific stores prevent unrelated indexes from contaminating hits.
+    from dataclasses import replace
+    for family, interfaces in {
+        "contextual": ("keyword_store", "document_store"),
+        "hierarchy": ("keyword_store", "document_store"),
+        "graph": ("document_store",),
+        "late": ("vector_store",),
+    }.items():
+        original = specs[family]
+        idx, ret = dict(original.indexing), dict(original.retrieval)
+        for interface in interfaces:
+            instance_name = family + "_" + interface
+            services[instance_name] = ServiceConfig(interface, "mock")
+            if interface in idx:
+                idx[interface] = instance_name
+            if interface in ret:
+                ret[interface] = instance_name
+        specs[family] = replace(original, indexing=idx, retrieval=ret)
     with build_unified(UnifiedConfiguration(services, specs), registry) as pipeline:
+        pipeline._instances["document_store"].upsert({"a": "cat", "b": "dog"})
         inputs = {
             "keyword": {"documents": {"a": "cat", "b": "dog"}},
             "semantic": {"documents": {"a": "cat", "b": "dog"}},
