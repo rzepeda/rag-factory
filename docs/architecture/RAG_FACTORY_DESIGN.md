@@ -88,6 +88,8 @@ Provider-specific mappings may include relations, types, indexes and query confi
 
 ## Testing and evaluation
 
+The implementation rules for test placement, isolation, provider-contract suites and CI gates are in [the testing standard](../standards/TESTING.md).
+
 - Unit: algorithms and contracts without a running database/model.
 - Adapter contract: at least two providers satisfy one interface.
 - Integration: externally provisioned services used only with explicit test setup.
