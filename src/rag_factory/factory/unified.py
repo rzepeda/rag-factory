@@ -31,6 +31,7 @@ from rag_factory.strategies.agentic_rag.retriever import AgenticRAGRetriever
 from rag_factory.pipelines.retrieval import RetrievalPipeline, RetrievalSource
 from rag_factory.strategies.hybrid_search.retriever import HybridRetriever
 from rag_factory.strategies.query_expansion.hyde import HyDERetriever
+from rag_factory.strategies.chunking.semantic import SemanticBoundaryChunker
 from rag_factory.strategies.knowledge_graph.hybrid import GraphVectorHybridRetriever
 
 
@@ -69,10 +70,11 @@ REQUIRES: dict[str, dict[str, tuple[ServiceRequirement, ...]]] = {
                                                        ServiceRequirement("document_store", frozenset({"get"})))},
     "agentic": {"indexing": (), "retrieval": (ServiceRequirement("llm", frozenset({"generate"})),)},
     "hybrid": {"indexing": (), "retrieval": ()},
+    "semantic_chunking": {"indexing": (ServiceRequirement("embedding", frozenset({"embed"})), ServiceRequirement("vector_store", frozenset({"upsert"}))), "retrieval": (ServiceRequirement("embedding", frozenset({"embed"})), ServiceRequirement("vector_store", frozenset({"search"})))},
     "hyde": {"indexing": (), "retrieval": (ServiceRequirement("llm", frozenset({"generate"})),)},
     "graph_vector_hybrid": {"indexing": (), "retrieval": ()},
 }
-INDEXED = frozenset({"keyword", "semantic", "contextual", "hierarchical",
+INDEXED = frozenset({"keyword", "semantic", "semantic_chunking", "contextual", "hierarchical",
                       "knowledge_graph", "late_chunking"})
 REFERENCED = frozenset({"reranking", "multi_query", "query_expansion", "self_reflective", "hyde"})
 COMPOSITES = REFERENCED | {"agentic", "hybrid", "graph_vector_hybrid"}
@@ -174,7 +176,7 @@ class UnifiedPipeline:
                     raise ValueError(f"Strategy {name} needs nonempty sources")
                 for source in names:
                     self._check_reference(name, source)
-            if spec.kind in {"semantic", "late_chunking"}:
+            if spec.kind in {"semantic", "late_chunking", "semantic_chunking"}:
                 model = spec.parameters.get("embedding_model")
                 if not isinstance(model, str) or not model.strip():
                     raise ValueError(f"Strategy {name} needs embedding_model")
@@ -218,6 +220,17 @@ class UnifiedPipeline:
         elif kind == "semantic":
             manifest = SemanticIndexer(get("embedding"), get("vector_store"), spec.parameters["embedding_model"]).index(
                 payload["documents"], artifact_id)
+        elif kind == "semantic_chunking":
+            chunks = {}
+            splitter = SemanticBoundaryChunker(get("embedding"),
+                spec.parameters.get("threshold", 0.6), spec.parameters.get("max_sentences", 5))
+            for document_id, text in payload["documents"].items():
+                for chunk_number, chunk in enumerate(splitter.chunk(text)):
+                    chunks[f"{document_id}::{chunk_number}"] = chunk
+            if not chunks:
+                raise ValueError("Semantic chunking produced no chunks")
+            manifest = SemanticIndexer(get("embedding"), get("vector_store"),
+                spec.parameters["embedding_model"]).index(chunks, artifact_id)
         elif kind == "contextual":
             manifest = ContextualIndexer(ContextGenerator(get("llm")), get("keyword_store"),
                                         get("document_store")).index(
@@ -245,7 +258,7 @@ class UnifiedPipeline:
                 raise ValueError(f"Unknown indexed strategy: {name}")
             spec = self.config.strategies[name]
             caps = {
-                "keyword": {"keywords"}, "semantic": {"vectors"},
+                "keyword": {"keywords"}, "semantic": {"vectors"}, "semantic_chunking": {"vectors"},
                 "contextual": {"keywords", "contextual", "chunks"},
                 "hierarchical": {"keywords", "hierarchy", "chunks"},
                 "knowledge_graph": {"graph", "documents"},
@@ -281,6 +294,9 @@ class UnifiedPipeline:
         elif kind == "semantic":
             result = SemanticRetriever(get("embedding"), get("vector_store"),
                                        params["embedding_model"]).retrieve(query, manifest, limit)
+        elif kind == "semantic_chunking":
+            result = SemanticRetriever(get("embedding"), get("vector_store"),
+                params["embedding_model"]).retrieve(query, manifest, limit)
         elif kind == "contextual":
             result = ContextualRetriever(get("keyword_store"), get("document_store"),
                                          get("tokenizer")).retrieve(query, manifest, limit)
