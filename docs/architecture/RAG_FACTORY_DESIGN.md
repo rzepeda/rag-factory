@@ -104,3 +104,16 @@ Provider-specific mappings may include relations, types, indexes and query confi
 6. Expand to contextual, hierarchical, graph and agentic workflows as interfaces prove adequate.
 
 Architectural decisions must be revised in this document before changing their boundaries in implementation.
+
+
+## Implemented contract baseline (2026-10-23)
+
+The following provider-independent Python modules now exist on `dev`:
+
+- `core/service_contracts.py`: `ServiceRequirement`, `ProviderDescriptor`, `StrategyRequirements`, `validate_service_bindings` for named service instances and separate indexing/retrieval requirements.
+- `core/mapping.py`: `LogicalEntity`, `LogicalModel`, `EntityMapping`, `StorageMapping`, `validate_storage_mapping` for required fields, relationships and storage operations.
+- `core/index_manifest.py`: `IndexManifest`, `IndexRequirement`, `validate_index_compatibility` for conservative artifact metadata validation.
+
+Unit tests: `tests/unit/core/test_service_and_mapping_contracts.py`.
+
+**Scope limitations:** these are declarative contracts, not a provider registry/factory, physical database schema introspection, executable pipelines or verified environment checks. Index manifest validation compares explicitly declared fields; it does not yet validate all provider-specific semantics or permissions. Existing `core/capabilities.py` and historical interface placeholders remain for incremental migration; do not conflate its legacy index capabilities with new provider service capabilities. Tests were written but have not been executed in this GitHub editing session.
