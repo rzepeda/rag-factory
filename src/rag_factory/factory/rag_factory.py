@@ -69,3 +69,66 @@ class RAGFactory:
         except BaseException:
             _close_owned(owned)
             raise
+
+
+    def build_semantic(
+        self,
+        services: Mapping[str, ServiceConfig],
+        bindings: Mapping[str, str],
+        embedding_model: str,
+    ) -> "SemanticPipeline":
+        """Build a semantic pipeline with configured test or external adapters."""
+        from rag_factory.core.interfaces.services import EmbeddingService, VectorStoreService
+        from rag_factory.strategies.semantic_search.indexer import (
+            REQUIREMENTS as SEMANTIC_REQUIREMENTS,
+            SemanticIndexer,
+        )
+        from rag_factory.strategies.semantic_search.retriever import SemanticRetriever
+
+        descriptors = {name: self.registry.descriptor(cfg) for name, cfg in services.items()}
+        validate_service_bindings(SEMANTIC_REQUIREMENTS.indexing, bindings, descriptors)
+        validate_service_bindings(SEMANTIC_REQUIREMENTS.retrieval, bindings, descriptors)
+        if not embedding_model.strip():
+            raise ValueError("Embedding model is required")
+        instances: dict[str, object] = {}
+        owned: list[object] = []
+        try:
+            for interface in ("embedding", "vector_store"):
+                name = bindings[interface]
+                if name not in instances:
+                    _, instance = self.registry.resolve(services[name])
+                    instances[name] = instance
+                    owned.append(instance)
+            embedding = instances[bindings["embedding"]]
+            store = instances[bindings["vector_store"]]
+            if not isinstance(embedding, EmbeddingService):
+                raise TypeError("Configured embedding does not implement its interface")
+            if not isinstance(store, VectorStoreService):
+                raise TypeError("Configured vector store does not implement its interface")
+            return SemanticPipeline(
+                SemanticIndexer(embedding, store, embedding_model),
+                SemanticRetriever(embedding, store, embedding_model),
+                tuple(owned),
+            )
+        except BaseException:
+            _close_owned(owned)
+            raise
+
+
+@dataclass
+class SemanticPipeline:
+    indexer: object
+    retriever: object
+    _owned: tuple[object, ...] = ()
+    _closed: bool = False
+
+    def close(self) -> None:
+        if not self._closed:
+            self._closed = True
+            _close_owned(list(self._owned))
+
+    def __enter__(self) -> "SemanticPipeline":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.close()
