@@ -131,3 +131,24 @@ Implemented under `factory/service_registry.py` and `factory/rag_factory.py`:
 - Tests in `tests/unit/core/test_factory_keyword.py` exercise swapping providers using configuration without changing strategy code, and invalid configurations.
 
 **Limitations:** this slice uses Python configuration objects, not a YAML loader; it does not yet support external provider adapters, physical mapping validation during factory construction, index manifests emitted from indexing, generic strategy registration, lifecycle/cleanup hooks or preflight checks. The in-memory ranking is simple token frequency matching, not BM25. Factory construction currently resolves configured instances before all requirements have been validated; future work should validate metadata first and manage rollback/cleanup of partially created instances.
+
+
+## Configuration and lifecycle update
+
+The initial keyword factory now supports a YAML loader at `factory/config.py` using `yaml.safe_load`, environment-variable substitution for complete `${VARIABLE}` scalar values, and named instance bindings. The implementation does **not** yet read the broad illustrative `pipelines:` format shown earlier: the implemented keyword-only YAML format is:
+
+```yaml
+services:
+  keywords:
+    interface: keyword_store
+    implementation: memory
+  tokens:
+    interface: tokenizer
+    implementation: regex
+keyword:
+  bindings:
+    keyword_store: keywords
+    tokenizer: tokens
+```
+
+Use `load_keyword_config(path)`, then `RAGFactory().build_keyword(config.services, config.bindings)`. The keyword pipeline supports a `with` context manager and closes owned adapters exposing `close()`. Provider declarations and requirements are checked **before** any provider constructor is called. Physical mapping support in YAML and generic pipeline definitions remain outstanding.
