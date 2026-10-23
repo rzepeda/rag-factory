@@ -1,7 +1,4 @@
-"""Registered provider implementations and configured instance construction.
-
-Registry is explicitly populated; importing it does not load provider SDKs.
-"""
+"""Explicit provider registry; metadata validation before instantiation."""
 
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping
@@ -26,16 +23,18 @@ class ServiceRegistry:
             raise ValueError(f"Duplicate provider registration: {key}")
         self._providers[key] = (descriptor, constructor)
 
-    def resolve(self, config: ServiceConfig) -> tuple[ProviderDescriptor, object]:
+    def descriptor(self, config: ServiceConfig) -> ProviderDescriptor:
         key = (config.interface, config.implementation)
         if key not in self._providers:
             raise ValueError(f"Unknown provider: {key}")
-        descriptor, constructor = self._providers[key]
-        return descriptor, constructor(**config.parameters)
+        return self._providers[key][0]
+
+    def resolve(self, config: ServiceConfig) -> tuple[ProviderDescriptor, object]:
+        descriptor = self.descriptor(config)
+        return descriptor, self._providers[(config.interface, config.implementation)][1](**config.parameters)
 
 
 def default_registry() -> ServiceRegistry:
-    """Only adapters requiring no external infrastructure are built in."""
     from rag_factory.services.keyword.memory import MemoryKeywordStore
     from rag_factory.services.tokenizer.regex import RegexTokenizer
 
