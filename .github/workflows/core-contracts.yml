@@ -1,4 +1,4 @@
-name: Core contracts CI
+name: Unit tests and build
 
 on:
   push:
@@ -29,7 +29,7 @@ jobs:
         run: python -m pip install --upgrade pip && python -m pip install -e ".[test]"
       - name: Build wheel and source distribution
         run: python -m build
-      - name: Test core contracts
+      - name: Test core contracts and keyword strategy
         run: python -m pytest tests/unit/core -v
       - name: Check installable wheel
         run: |
