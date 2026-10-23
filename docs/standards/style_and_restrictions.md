@@ -16,3 +16,7 @@ Use PEP 8, Black and meaningful type annotations. Avoid circular imports and she
 10. Don't introduce strategy-specific database schemas or migrations for strategies that have no persistence need.
 
 See [canonical architecture](../architecture/RAG_FACTORY_DESIGN.md) and [deprecations](../architecture/DEPRECATIONS.md).
+
+## Testing
+
+Follow the [testing standard](TESTING.md) for test categories, fixtures, provider contracts, safe external integration, CI scope and definition of done.
