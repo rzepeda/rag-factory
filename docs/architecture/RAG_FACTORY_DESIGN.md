@@ -152,3 +152,10 @@ keyword:
 ```
 
 Use `load_keyword_config(path)`, then `RAGFactory().build_keyword(config.services, config.bindings)`. The keyword pipeline supports a `with` context manager and closes owned adapters exposing `close()`. Provider declarations and requirements are checked **before** any provider constructor is called. Physical mapping support in YAML and generic pipeline definitions remain outstanding.
+
+
+## Mock-backed composition milestone (2026-10-23)
+
+`pipelines/indexing.py` now composes named indexing steps, while `pipelines/retrieval.py` composes independently configured retrieval sources. `strategies/hybrid_search/retriever.py` implements deterministic reciprocal-rank fusion (RRF) across their ranked result identifiers. `evaluation/metrics.py` provides offline `recall_at_k` and `reciprocal_rank_at_k` for fixed relevance judgments. `tests/unit/core/test_composition.py` exercises these pieces using mock keyword, embedding and vector stores and runs in Python 3.12 CI.
+
+These are **lightweight first implementations**, not a generic pipeline DAG, statistical evaluation framework, vector-model quality benchmark or complete artifact registry. Retrieval sources currently use explicitly supplied Python callables; the semantic retriever checks its manifest at retrieval time. Automatic YAML pipeline construction, indexing manifests for the keyword store, advanced strategies (multi-query, contextual and hierarchical), and full reproducible experiment orchestration are still future milestones. No external infrastructure is required for these tests.
