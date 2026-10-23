@@ -135,3 +135,24 @@ def test_external_manifest_handoff_uses_prepopulated_vector_store():
                 embedding_dimensions=2, distance_metric="euclidean",
             )})
         assert pipeline.retrieve("cat", 1) == ["a"]
+
+
+def test_saved_manifest_catalog_reused_by_separate_runtime(tmp_path):
+    from rag_factory.core.artifact_catalog import load_manifests, save_manifests
+    shared = MockVectorStore()
+    reg = ServiceRegistry()
+    reg.register(ProviderDescriptor("embedding", "mock", frozenset({"embed"})), MockEmbedding)
+    reg.register(ProviderDescriptor("vector_store", "shared", frozenset({"upsert", "search"})),
+                 lambda: shared)
+    cfg = PipelineConfiguration(
+        {"emb": ServiceConfig("embedding", "mock"),
+         "vectors": ServiceConfig("vector_store", "shared")},
+        {"embedding": "emb", "vector_store": "vectors"},
+        ("semantic",), "mock-v1",
+    )
+    with build_pipeline(cfg, reg) as indexing:
+        manifests = indexing.index({"a": "cat", "b": "dog"})
+        save_manifests(tmp_path / "catalog.json", manifests)
+    with build_pipeline(cfg, reg) as retrieval:
+        retrieval.attach_artifacts(load_manifests(tmp_path / "catalog.json"))
+        assert retrieval.retrieve("cat", 1) == ["a"]
