@@ -18,3 +18,10 @@ A checked-in source file containing only a stub is not an implemented feature. T
 ## Advanced strategy inventory
 
 The source tree contains 11 original strategy families. Seven currently have an executable baseline (keyword, semantic, hybrid retrieval, multi-query, query expansion, contextual, hierarchical). Late chunking now implements full-document contextual token encoding followed by span pooling, with a reference mock encoder. Agentic RAG now has a bounded allowlisted retrieval-routing baseline; knowledge graph traversal and self-reflective grading have executable offline baselines. Reranking is a twelfth family newly introduced as an executable mock-backed retrieval strategy; all **twelve strategy families have initial executable baselines**. The hybrid indexing stub is not implemented (only hybrid retrieval/fusion is), and the other baselines are not production-complete.
+
+
+## Service-free integration work (2026-10-23)
+
+New runtime slice: `factory/runtime.py` and `factory/runtime_config.py` build and validate keyword, semantic or hybrid pipelines from one YAML definition, using shared provider instances and consistent cleanup. `core/artifact_catalog.py` saves/loads versioned JSON index manifests for separate execution runs, and `RuntimePipeline.attach_artifacts()` validates externally produced metadata. Tests exercise full offline YAML indexing/retrieval and cross-execution manifest reuse against a shared mock store. See `docs/OFFLINE_RUNTIME.md`.
+
+**Still pending without real services:** extend the unified factory to all other strategy families; reconcile common retrieval result contracts (IDs versus document tuples); make indexing/retrieval bindings individually configurable; support provider-defined physical mappings in the unified runtime; enforce configuration-defined artifact locators, integrity/authorization as separate concerns, and atomic or rollback-aware multi-index runs; broader mock end-to-end tests and robust lifecycle behavior. Real adapter implementation and external integration tests remain deferred.
