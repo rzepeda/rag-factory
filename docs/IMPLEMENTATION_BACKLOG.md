@@ -5,7 +5,7 @@ Tracked implementation priorities on `dev`. The first item is the currently sele
 | Priority | Work | Acceptance criteria | Status |
 | --- | --- | --- | --- |
 | 1 | Contextual retrieval | LLM-generated bounded chunk context, index/search via interfaces, preserve original text, tests with mocks | Implemented in this change |
-| 2 | Hierarchical retrieval | Parent/child indexing and expansion with deterministic mock storage and validated relationships | Pending |
+| 2 | Hierarchical retrieval | Parent/child indexing and expansion with deterministic mock storage and validated relationships | Implemented (mock-backed baseline) |
 | 3 | Retrieval strategy registry and configuration | Generic strategy selection and composition from config rather than manually constructed callables | Pending |
 | 4 | Shared provider behavioral contracts | Parameterized conformance tests for each interface including lifecycle and error semantics | Pending |
 | 5 | Index artifact and mapping hardening | Keyword manifests, persistence locators, permissions, embedding revision, operational mapping validation | Pending |
