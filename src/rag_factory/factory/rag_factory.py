@@ -1,4 +1,4 @@
-"""Configuration-selected service instances and a first keyword pipeline builder."""
+"""Configuration-driven keyword builder with validated, owned service instances."""
 
 from dataclasses import dataclass
 from typing import Mapping
@@ -10,10 +10,30 @@ from rag_factory.strategies.keyword_search.indexer import KeywordIndexer, REQUIR
 from rag_factory.strategies.keyword_search.retriever import KeywordRetriever
 
 
+def _close_owned(instances: list[object]) -> None:
+    for instance in reversed(instances):
+        close = getattr(instance, "close", None)
+        if callable(close):
+            close()
+
+
 @dataclass
 class KeywordPipeline:
     indexer: KeywordIndexer
     retriever: KeywordRetriever
+    _owned: tuple[object, ...] = ()
+    _closed: bool = False
+
+    def close(self) -> None:
+        if not self._closed:
+            self._closed = True
+            _close_owned(list(self._owned))
+
+    def __enter__(self) -> "KeywordPipeline":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.close()
 
 
 class RAGFactory:
@@ -25,27 +45,27 @@ class RAGFactory:
         services: Mapping[str, ServiceConfig],
         bindings: Mapping[str, str],
     ) -> KeywordPipeline:
-        """Bind interfaces to named configured instances, verifying before use.
-
-        The same named store is shared by indexing and retrieval. No backend
-        infrastructure is installed or provisioned.
-        """
-        instances: dict[str, object] = {}
-        descriptors = {}
-        for name, config in services.items():
-            descriptor, instance = self.registry.resolve(config)
-            descriptors[name] = descriptor
-            instances[name] = instance
-
+        """Validate provider declarations first, construct only used services."""
+        descriptors = {name: self.registry.descriptor(cfg) for name, cfg in services.items()}
         validate_service_bindings(REQUIREMENTS.indexing, bindings, descriptors)
         validate_service_bindings(REQUIREMENTS.retrieval, bindings, descriptors)
-        store = instances[bindings["keyword_store"]]
-        tokenizer = instances[bindings["tokenizer"]]
-        if not isinstance(store, KeywordStoreService):
-            raise TypeError("Configured keyword store does not implement its interface")
-        if not isinstance(tokenizer, TokenizerService):
-            raise TypeError("Configured tokenizer does not implement its interface")
-        return KeywordPipeline(
-            indexer=KeywordIndexer(store),
-            retriever=KeywordRetriever(store, tokenizer),
-        )
+
+        instances: dict[str, object] = {}
+        owned: list[object] = []
+        try:
+            for interface in ("keyword_store", "tokenizer"):
+                name = bindings[interface]
+                if name not in instances:
+                    _, instance = self.registry.resolve(services[name])
+                    instances[name] = instance
+                    owned.append(instance)
+            store = instances[bindings["keyword_store"]]
+            tokenizer = instances[bindings["tokenizer"]]
+            if not isinstance(store, KeywordStoreService):
+                raise TypeError("Configured keyword store does not implement its interface")
+            if not isinstance(tokenizer, TokenizerService):
+                raise TypeError("Configured tokenizer does not implement its interface")
+            return KeywordPipeline(KeywordIndexer(store), KeywordRetriever(store, tokenizer), tuple(owned))
+        except BaseException:
+            _close_owned(owned)
+            raise
