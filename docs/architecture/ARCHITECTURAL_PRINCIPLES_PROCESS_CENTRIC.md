@@ -1,109 +1,28 @@
-# **ARCHITECTURAL PRINCIPLES - PROCESS-CENTRIC**
+# Historical process-centric principles (superseded)
 
-*Quick reference for structure, rules, and decisions in process-centric projects*
+> **SUPERSEDED on 2026-10-23.** This document records the prior architectural direction only. Do not use it as implementation guidance. The normative design is [RAG_FACTORY_DESIGN.md](RAG_FACTORY_DESIGN.md); see [DEPRECATIONS.md](DEPRECATIONS.md).
 
----
+The former proposal made `processors/`, `handlers/`, `strategies/` and strategy-local entities/migrations a mandatory layering pattern. That was useful for considering single-responsibility operations, but it introduced unnecessary indirection for the chosen framework.
 
-## **1. Project Structure**
+## Principles retained
 
-### **Fixed Scaffold (Never Modify)**
-```
-/
-├── .venv/
-├── .env
-├── .gitignore
-├── pyproject.toml
-├── agent_tools/        # IMMUTABLE
-├── resources/
-├── docs/
-└── workspace/
-```
+- Small, testable operations and clear contracts.
+- Separate orchestration from provider implementation.
+- Prefer stateless logic and explicit dependency injection.
+- Independent unit, integration and benchmark tests.
+- No circular dependencies and no infrastructure provisioning inside core.
 
-### **Core Structure (Architect Designs)**
-```
-src/{package}/core/
-├── processors/         # Individual operations (single responsibility)
-├── pipelines/          # Workflow orchestration
-├── strategies/         # Algorithm choices (swappable)
-├── handlers/           # Cross-cutting concerns (errors, logging)
-└── interfaces/         # Contracts (Processor, Strategy, Pipeline)
+## Principles superseded
 
-src/{package}/
-├── cli/                # Terminal interface
-├── gui/                # Visual interface (optional)
-└── utils/              # Infrastructure (I/O, config)
+- A mandatory `components/` or `processors/` directory for every processing step.
+- Universal `Processor` / `Handler` interfaces and an obligatory wrapper between strategies and services.
+- Treating every strategy as one end-to-end index-and-query object.
+- Requiring one physical entity schema or automatic migration per strategy.
+- Treating model servers and databases as assets to bundle, load, install or start as part of factory creation.
+- Treating a directory scaffold as proof of implemented functionality.
 
-tests/
-├── unit/processors/    # Isolated processor tests
-├── unit/strategies/    # Algorithm tests
-├── unit/pipelines/     # Workflow tests
-├── integration/        # End-to-end workflows
-└── performance/        # Benchmarks
-```
+## Current rule
 
----
+Strategies define distinct indexing and retrieval behavior, service capability requirements and logical models. Service interfaces and their provider implementations are reusable. Configuration chooses provider instances and physical mappings. The factory resolves and validates compatibility. Pipelines compose operations. Experiments measure configurations.
 
-## **2. Component Rules**
-
-| Component | Location | Purpose | Responsibilities | Boundaries |
-|-----------|----------|---------|------------------|------------|
-| **Processors** | `core/processors/` | Operations | Single transformation step | Stateless, focused |
-| **Pipelines** | `core/pipelines/` | Orchestration | Chain processors, manage flow | Accepts processors as args |
-| **Strategies** | `core/strategies/` | Algorithms | Swappable implementations | Common interface |
-| **Handlers** | `core/handlers/` | Cross-cutting | Errors, logging, retries | Orthogonal to processing |
-| **Interfaces** | `core/interfaces/` | Contracts | Define component APIs | Abstract base classes |
-| **CLI/GUI** | `cli/`, `gui/` | User interface | Call pipelines, format I/O | Delegates to pipelines |
-| **Utils** | `utils/` | Infrastructure | File I/O, config | Generic utilities only |
-
-**Composition flow:** `CLI/GUI → Pipelines → Processors/Strategies`  
-**Core rule:** Components are composable and testable in isolation
-
----
-
-## **3. Decision Framework**
-
-| Question | Answer |
-|----------|--------|
-| Single operation/transformation? | → `processors/` |
-| Sequence of operations? | → `pipelines/` |
-| Alternative algorithms for same task? | → `strategies/` |
-| Error handling/logging/retries? | → `handlers/` |
-| Component contract/interface? | → `interfaces/` |
-| User input/output? | → `cli/` or `gui/` |
-| File I/O/configuration? | → `utils/` |
-
----
-
-## **4. Key Distinctions**
-
-**Processor vs Pipeline vs Strategy:**
-- **Processor**: Single step (validate, transform, filter) → `processors/validator.py`
-- **Pipeline**: Workflow (step1 → step2 → step3) → `pipelines/data_pipeline.py`
-- **Strategy**: Algorithm choice (QuickSort vs MergeSort) → `strategies/sorting/quick_sort.py`
-
-**Files:**
-```
-processors/validator.py             # What it does
-pipelines/standard_pipeline.py      # Workflow name
-strategies/sorting/quick_sort.py    # Category/algorithm
-handlers/error_handler.py           # What it handles
-interfaces/processor.py             # Contract name
-```
-
-**Testing:**
-- `unit/processors/` - Isolated, no dependencies
-- `unit/strategies/` - Algorithm correctness
-- `unit/pipelines/` - Mock processors
-- `integration/` - Real workflows
-- `performance/` - Benchmarks
-
----
-
-## **5. Core Principles**
-
-✓ Processors are small and focused  
-✓ Pipelines compose processors  
-✓ Strategies share common interfaces  
-✓ Handlers are optional and orthogonal  
-✓ Components are stateless when possible  
-✓ All components implement interfaces
+See the canonical design for precise boundaries and lifecycle responsibilities.
