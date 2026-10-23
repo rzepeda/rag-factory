@@ -30,7 +30,7 @@ def test_rejects_invalid_hierarchy_and_missing_parent():
     indexer = HierarchicalIndexer(MockKeywordStore(), MockDocumentStore())
     with pytest.raises(ValueError, match="unknown parent"):
         indexer.index({"p": "parent"}, {"c": "child"}, {"c": "absent"}, "idx")
-    with pytest.raises(ValueError, match="exactly one parent"):
+    with pytest.raises(ValueError, match="requires child relationships"):
         indexer.index({"p": "parent"}, {"c": "child"}, {}, "idx")
     with pytest.raises(ValueError, match="own parent"):
         indexer.index({"p": "text"}, {"p": "text"}, {"p": "p"}, "idx")
