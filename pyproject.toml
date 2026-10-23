@@ -20,3 +20,11 @@ include = ["rag_factory*"]
 testpaths = ["tests/unit/core"]
 python_files = ["test_*.py"]
 addopts = "-ra"
+
+# Other suites are opt-in until their placeholders have been triaged.
+markers = [
+    "integration: requires configured infrastructure",
+    "e2e: end-to-end executable workflow",
+    "external: uses a real remote or locally hosted provider",
+    "performance: reproducible benchmarks (not a correctness gate)",
+]
