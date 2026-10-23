@@ -30,6 +30,8 @@ from rag_factory.strategies.self_reflective.grading.grader import RelevanceGrade
 from rag_factory.strategies.agentic_rag.retriever import AgenticRAGRetriever
 from rag_factory.pipelines.retrieval import RetrievalPipeline, RetrievalSource
 from rag_factory.strategies.hybrid_search.retriever import HybridRetriever
+from rag_factory.strategies.query_expansion.hyde import HyDERetriever
+from rag_factory.strategies.knowledge_graph.hybrid import GraphVectorHybridRetriever
 
 
 REQUIRES: dict[str, dict[str, tuple[ServiceRequirement, ...]]] = {
@@ -67,11 +69,13 @@ REQUIRES: dict[str, dict[str, tuple[ServiceRequirement, ...]]] = {
                                                        ServiceRequirement("document_store", frozenset({"get"})))},
     "agentic": {"indexing": (), "retrieval": (ServiceRequirement("llm", frozenset({"generate"})),)},
     "hybrid": {"indexing": (), "retrieval": ()},
+    "hyde": {"indexing": (), "retrieval": (ServiceRequirement("llm", frozenset({"generate"})),)},
+    "graph_vector_hybrid": {"indexing": (), "retrieval": ()},
 }
 INDEXED = frozenset({"keyword", "semantic", "contextual", "hierarchical",
                       "knowledge_graph", "late_chunking"})
-REFERENCED = frozenset({"reranking", "multi_query", "query_expansion", "self_reflective"})
-COMPOSITES = REFERENCED | {"agentic", "hybrid"}
+REFERENCED = frozenset({"reranking", "multi_query", "query_expansion", "self_reflective", "hyde"})
+COMPOSITES = REFERENCED | {"agentic", "hybrid", "graph_vector_hybrid"}
 
 
 @dataclass(frozen=True)
@@ -164,7 +168,7 @@ class UnifiedPipeline:
             for option in ("source",):
                 if spec.kind in REFERENCED:
                     self._check_reference(name, spec.parameters.get(option))
-            if spec.kind in {"hybrid", "agentic"}:
+            if spec.kind in {"hybrid", "agentic", "graph_vector_hybrid"}:
                 names = spec.parameters.get("sources")
                 if not isinstance(names, list) or not names:
                     raise ValueError(f"Strategy {name} needs nonempty sources")
@@ -186,7 +190,7 @@ class UnifiedPipeline:
         if name in visiting:
             raise ValueError("Cyclic strategy references")
         spec = self.config.strategies[name]
-        refs = spec.parameters.get("sources", []) if spec.kind in {"hybrid", "agentic"} else (
+        refs = spec.parameters.get("sources", []) if spec.kind in {"hybrid", "agentic", "graph_vector_hybrid"} else (
             [spec.parameters["source"]] if spec.kind in REFERENCED else [])
         for ref in refs:
             self._validate_references(ref, visiting | {name})
@@ -303,6 +307,17 @@ class UnifiedPipeline:
             result = SelfReflectiveRetriever(
                 source, get("document_store"), RelevanceGrader(get("llm")),
                 params.get("max_attempts", 2)).retrieve(query, limit)
+        elif kind == "hyde":
+            result = HyDERetriever(get("llm"), source).retrieve(query, limit)
+        elif kind == "graph_vector_hybrid":
+            refs = params["sources"]
+            if len(refs) != 2:
+                raise ValueError("Graph/vector hybrid requires two source strategies")
+            result = GraphVectorHybridRetriever(
+                lambda q, n: [h.document_id for h in self.retrieve(refs[0], q, n)],
+                lambda q, n: [h.document_id for h in self.retrieve(refs[1], q, n)],
+                params.get("rank_constant", 60),
+            ).retrieve(query, limit)
         elif kind == "agentic":
             tools = {ref: (lambda q, n, ref=ref: [h.document_id for h in self.retrieve(ref, q, n)])
                      for ref in params["sources"]}
