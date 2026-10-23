@@ -1,0 +1,1 @@
+"""Offline vector store adapters."""
