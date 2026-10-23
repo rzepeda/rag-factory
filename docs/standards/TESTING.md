@@ -55,7 +55,7 @@ python -m pytest tests/unit/core -v
 python -m build
 ```
 
-The **current baseline** is `tests/unit/core`, on Python 3.10, 3.11 and 3.12. GitHub Actions builds wheel/sdist, runs this directory, and verifies installable wheel imports. As implementation expands, extend CI's explicitly included test paths. Do not replace it with an unrestricted `pytest` run until legacy placeholders have been triaged.
+The **current baseline** is `tests/unit/core`, on Python 3.12 only. GitHub Actions builds wheel/sdist, runs this directory, and verifies installable wheel imports. As implementation expands, extend CI's explicitly included test paths. Do not replace it with an unrestricted `pytest` run until legacy placeholders have been triaged.
 
 Use markers for new opt-in test suites: `integration`, `e2e`, `external`, `performance`. The CI correctness gate should run offline unit and fake-backed contract tests; external integration and performance jobs require separate infrastructure and are not part of the default gate.
 
