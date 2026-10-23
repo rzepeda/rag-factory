@@ -106,3 +106,32 @@ def test_missing_provider_unknown_strategy_and_bad_yaml(tmp_path):
     path.write_text("pipeline: []")
     with pytest.raises(ValueError, match="Expected"):
         load_pipeline_config(path)
+
+
+def test_external_manifest_handoff_uses_prepopulated_vector_store():
+    # Two configured pipelines point at the same already-managed storage.
+    from rag_factory.core.index_manifest import IndexManifest
+    shared = MockVectorStore()
+    shared.upsert({"a": MockEmbedding().embed(["cat"])[0]})
+    reg = ServiceRegistry()
+    reg.register(ProviderDescriptor("embedding", "mock", frozenset({"embed"})), MockEmbedding)
+    reg.register(ProviderDescriptor("vector_store", "shared", frozenset({"upsert", "search"})),
+                 lambda: shared)
+    cfg = PipelineConfiguration(
+        {"emb": ServiceConfig("embedding", "mock"),
+         "vectors": ServiceConfig("vector_store", "shared")},
+        {"embedding": "emb", "vector_store": "vectors"},
+        ("semantic",), "mock-v1",
+    )
+    with build_pipeline(cfg, reg) as pipeline:
+        artifact = IndexManifest("existing", frozenset({"vectors"}), "1",
+                                 embedding_model="mock-v1", embedding_dimensions=2,
+                                 distance_metric="euclidean")
+        pipeline.attach_artifacts({"semantic": artifact})
+        assert pipeline.retrieve("cat", 1) == ["a"]
+        with pytest.raises(ValueError, match="embedding_model"):
+            pipeline.attach_artifacts({"semantic": IndexManifest(
+                "wrong", frozenset({"vectors"}), "1", embedding_model="other",
+                embedding_dimensions=2, distance_metric="euclidean",
+            )})
+        assert pipeline.retrieve("cat", 1) == ["a"]
