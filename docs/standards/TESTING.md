@@ -73,3 +73,16 @@ Do not impose an arbitrary global percentage while most source files remain plac
 6. For persisted indexes, compatibility and artifact reuse behavior are tested.
 
 See [canonical architecture](../architecture/RAG_FACTORY_DESIGN.md) and [coding guardrails](style_and_restrictions.md).
+
+
+## Implemented first vertical slice
+
+`tests/mocks/services.py` contains eight **test-only** deterministic implementations of the currently introduced service interfaces: LLM, tokenizer, embedding, vector store, keyword store, graph store, reranker and document store. They avoid networking and real infrastructure, and are not substitutes for real provider adapters.
+
+`strategies/keyword_search/indexer.py` and `retriever.py` implement the first small strategy against injected `KeywordStoreService` and `TokenizerService` protocols. `tests/unit/core/test_keyword_strategy.py` checks behavior, deterministic mocks and invalid inputs. Its in-memory keyword backend counts term occurrences; it is **not BM25, PostgreSQL FTS, or a production search implementation**. Strategy-level indexing/retrieval manifests and the configuration-driven factory remain future work.
+
+Run these tests through the offline core suite:
+
+```bash
+python -m pytest tests/unit/core -v
+```
