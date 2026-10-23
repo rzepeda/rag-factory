@@ -30,3 +30,17 @@ class KeywordIndexer:
             raise ValueError("Documents require nonempty IDs and string text")
         self.store.upsert(documents)
         return len(documents)
+
+    def index_with_manifest(self, documents: Mapping[str, str], artifact_id: str):
+        """Index documents and describe the keyword artifact without changing index()."""
+        from rag_factory.core.index_manifest import IndexManifest
+
+        if not isinstance(artifact_id, str) or not artifact_id.strip():
+            raise ValueError("Artifact identifier is required")
+        self.index(documents)
+        return IndexManifest(
+            artifact_id=artifact_id,
+            capabilities=frozenset({"keywords"}),
+            schema_version="1",
+            analyzer="word-lowercase",
+        )
