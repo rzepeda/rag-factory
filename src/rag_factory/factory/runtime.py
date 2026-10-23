@@ -6,7 +6,7 @@ separates preconstruction validation from execution. It provisions nothing.
 from dataclasses import dataclass, field
 from typing import Mapping
 
-from rag_factory.core.index_manifest import IndexManifest
+from rag_factory.core.index_manifest import IndexManifest, IndexRequirement, validate_index_compatibility
 from rag_factory.core.interfaces.services import (
     EmbeddingService, KeywordStoreService, TokenizerService, VectorStoreService,
 )
@@ -58,6 +58,28 @@ class RuntimePipeline:
             new_artifacts["semantic"] = self.semantic.index(documents, "semantic-index")
         self._artifacts.update(new_artifacts)
         return dict(new_artifacts)
+
+    def attach_artifacts(self, artifacts: Mapping[str, IndexManifest]) -> None:
+        """Adopt external index metadata after compatibility validation.
+
+        The configured services must already point to the underlying persisted
+        index; attaching a manifest never creates or copies an index.
+        """
+        if self._closed:
+            raise RuntimeError("Pipeline is closed")
+        for strategy, artifact in artifacts.items():
+            if strategy == "keyword" and self.keyword_retriever:
+                requirement = IndexRequirement(frozenset({"keywords"}), schema_version="1")
+            elif strategy == "semantic" and self.semantic_retriever:
+                requirement = IndexRequirement(
+                    frozenset({"vectors"}), schema_version="1",
+                    embedding_model=self.semantic_retriever.embedding_model,
+                    distance_metric=self.semantic_retriever.distance_metric,
+                )
+            else:
+                raise ValueError(f"Unknown or unconfigured artifact strategy: {strategy}")
+            validate_index_compatibility(artifact, requirement)
+        self._artifacts.update(artifacts)
 
     def retrieve(self, query: str, limit: int = 5) -> list[str]:
         if self._closed:
