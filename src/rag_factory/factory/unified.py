@@ -138,65 +138,52 @@ def normalize_hits(values: list[Any]) -> list[RetrievalHit]:
     return hits
 
 
-class UnifiedPipeline:
-    def __init__(self, config: UnifiedConfiguration, registry: ServiceRegistry):
-        self.config = config
-        self._instances = {}
-        self._owned = []
-        self._artifacts: dict[str, IndexManifest] = {}
-        self._failed_indexes: set[str] = set()
-        self._hierarchies = {}
-        self._closed = False
-        self._validate(registry)
-        try:
-            for name in self._service_names():
-                _, obj = registry.resolve(config.services[name])
-                self._instances[name] = obj
-                self._owned.append(obj)
-        except BaseException:
-            try:
-                self.close()
-            except Exception:
-                pass  # Preserve the construction failure.
-            raise
+def validate_unified_configuration(config: UnifiedConfiguration,
+                                   registry: ServiceRegistry | None = None) -> UnifiedConfiguration:
+    """Validate all bindings, references and parameters without constructing providers."""
+    registry = registry if registry is not None else default_registry()
 
-    def _service_names(self):
-        return tuple(dict.fromkeys(
-            spec.indexing[req.interface] if stage == "indexing" else spec.retrieval[req.interface]
-            for spec in self.config.strategies.values()
-            for stage in ("indexing", "retrieval")
-            for req in REQUIRES[spec.kind][stage]
-        ))
+    def check_reference(owner, reference):
+        if not isinstance(reference, str) or reference not in config.strategies or reference == owner:
+            raise ValueError(f"Strategy {owner} has an invalid source reference")
 
-    def _validate(self, registry):
+    def validate_references(name, visiting):
+        if name in visiting:
+            raise ValueError("Cyclic strategy references")
+        spec = config.strategies[name]
+        refs = spec.parameters.get("sources", []) if spec.kind in {"hybrid", "agentic", "graph_vector_hybrid"} else (
+            [spec.parameters["source"]] if spec.kind in REFERENCED else [])
+        for ref in refs:
+            validate_references(ref, visiting | {name})
+
         used_names = {
             binding.get(req.interface)
-            for spec in self.config.strategies.values()
+            for spec in config.strategies.values()
             for stage, binding in (("indexing", spec.indexing), ("retrieval", spec.retrieval))
             for req in REQUIRES[spec.kind][stage]
         }
         descriptors = {
-            name: registry.descriptor(self.config.services[name])
-            for name in used_names if name is not None and name in self.config.services
+            name: registry.descriptor(config.services[name])
+            for name in used_names if name is not None and name in config.services
         }
-        for name, spec in self.config.strategies.items():
+        for name, spec in config.strategies.items():
             for stage, bindings in (("indexing", spec.indexing), ("retrieval", spec.retrieval)):
                 validate_service_bindings(REQUIRES[spec.kind][stage], bindings, descriptors)
             for option in ("source",):
                 if spec.kind in REFERENCED:
-                    self._check_reference(name, spec.parameters.get(option))
+                    check_reference(name, spec.parameters.get(option))
             if spec.kind in {"hybrid", "agentic", "graph_vector_hybrid"}:
                 names = spec.parameters.get("sources")
                 if not isinstance(names, list) or not names:
                     raise ValueError(f"Strategy {name} needs nonempty sources")
                 for source in names:
-                    self._check_reference(name, source)
+                    check_reference(name, source)
             if spec.kind in {"semantic", "late_chunking", "semantic_chunking"}:
                 model = spec.parameters.get("embedding_model")
                 if not isinstance(model, str) or not model.strip():
                     raise ValueError(f"Strategy {name} needs embedding_model")
         # Reject malformed strategy parameters before any provider is constructed.
-        for name, spec in self.config.strategies.items():
+        for name, spec in config.strategies.items():
             params = spec.parameters
             positive = {
                 "max_variants": {"multi_query", "query_expansion"},
@@ -230,7 +217,7 @@ class UnifiedPipeline:
             if spec.kind in {"hybrid", "agentic", "graph_vector_hybrid"}:
                 if len(set(params["sources"])) != len(params["sources"]):
                     raise ValueError(f"Strategy {name}: duplicate source references")
-        for name, spec in self.config.strategies.items():
+        for name, spec in config.strategies.items():
             for key in ("artifact_id", "resource_locator", "access_scope", "embedding_revision"):
                 if key in spec.parameters and (
                     spec.kind not in INDEXED
@@ -239,21 +226,41 @@ class UnifiedPipeline:
                 ):
                     raise ValueError(f"Strategy {name}: invalid {key}")
         # Detect cycles before construction or retrieval.
-        for name in self.config.strategies:
-            self._validate_references(name, set())
+        for name in config.strategies:
+            validate_references(name, set())
 
-    def _check_reference(self, owner, reference):
-        if not isinstance(reference, str) or reference not in self.config.strategies or reference == owner:
-            raise ValueError(f"Strategy {owner} has an invalid source reference")
+    return config
 
-    def _validate_references(self, name, visiting):
-        if name in visiting:
-            raise ValueError("Cyclic strategy references")
-        spec = self.config.strategies[name]
-        refs = spec.parameters.get("sources", []) if spec.kind in {"hybrid", "agentic", "graph_vector_hybrid"} else (
-            [spec.parameters["source"]] if spec.kind in REFERENCED else [])
-        for ref in refs:
-            self._validate_references(ref, visiting | {name})
+
+class UnifiedPipeline:
+    def __init__(self, config: UnifiedConfiguration, registry: ServiceRegistry):
+        self.config = config
+        self._instances = {}
+        self._owned = []
+        self._artifacts: dict[str, IndexManifest] = {}
+        self._failed_indexes: set[str] = set()
+        self._hierarchies = {}
+        self._closed = False
+        validate_unified_configuration(config, registry)
+        try:
+            for name in self._service_names():
+                _, obj = registry.resolve(config.services[name])
+                self._instances[name] = obj
+                self._owned.append(obj)
+        except BaseException:
+            try:
+                self.close()
+            except Exception:
+                pass  # Preserve the construction failure.
+            raise
+
+    def _service_names(self):
+        return tuple(dict.fromkeys(
+            spec.indexing[req.interface] if stage == "indexing" else spec.retrieval[req.interface]
+            for spec in self.config.strategies.values()
+            for stage in ("indexing", "retrieval")
+            for req in REQUIRES[spec.kind][stage]
+        ))
 
     def _service(self, name, stage, interface):
         spec = self.config.strategies[name]
