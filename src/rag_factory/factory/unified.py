@@ -3,9 +3,10 @@
 This is an opt-in unified API. The older keyword/semantic runtime remains
 unchanged while callers migrate. No provider provisioning occurs here.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Mapping, Callable
 from rag_factory.core.index_manifest import IndexManifest
+from rag_factory.core.index_payloads import validate_index_payload
 from rag_factory.core.service_contracts import ServiceRequirement, validate_service_bindings
 from rag_factory.factory.service_registry import ServiceConfig, ServiceRegistry, default_registry
 from rag_factory.strategies.keyword_search.indexer import KeywordIndexer
@@ -249,12 +250,17 @@ class UnifiedPipeline:
     def index(self, name: str, payload: Mapping[str, Any]) -> IndexManifest:
         """Index one strategy using explicit payloads; never mutate shared stores automatically."""
         self._require_open()
+        if name not in self.config.strategies:
+            raise ValueError(f"Unknown strategy: {name}")
         spec = self.config.strategies[name]
         kind = spec.kind
-        if kind not in INDEXED:
-            raise ValueError(f"{kind} does not implement an indexing stage")
+        validate_index_payload(kind, payload)
+        artifact_id = payload.get("artifact_id", spec.parameters.get("artifact_id", name + "-index"))
+        if "artifact_id" in spec.parameters and artifact_id != spec.parameters["artifact_id"]:
+            raise ValueError(f"Strategy {name}: index artifact_id does not match configuration")
         get = lambda interface: self._service(name, "indexing", interface)
-        artifact_id = payload.get("artifact_id", name + "-index")
+        self._artifacts.pop(name, None)
+        self._hierarchies.pop(name, None)
         if kind == "keyword":
             manifest = KeywordIndexer(get("keyword_store")).index_with_manifest(payload["documents"], artifact_id)
         elif kind == "semantic":
