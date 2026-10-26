@@ -180,3 +180,19 @@ def test_strict_yaml_field_diagnostics_include_path(tmp_path, capsys, yaml_text,
     assert status == 2 and io.out == ""
     assert str(file) in io.err
     assert message in io.err
+
+
+def test_cli_trace_json_lines_are_separate_from_results(capsys):
+    status, io = call_cli(
+        capsys, "retrieve", "--payloads", str(PAYLOADS),
+        "--strategy", "lexical", "--query", "cats",
+        "--trace",
+    )
+    assert status == 0
+    assert json.loads(io.out)["hits"]
+    events = [json.loads(line) for line in io.err.splitlines()]
+    assert [item["stage"] for item in events] == ["indexing", "retrieval"]
+    assert all(item["status"] == "success" for item in events)
+    assert all(item["strategy"] == "lexical" for item in events)
+    assert "Cats purr" not in io.err
+    assert '"query"' not in io.err
