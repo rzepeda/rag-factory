@@ -144,7 +144,10 @@ class UnifiedPipeline:
                 self._instances[name] = obj
                 self._owned.append(obj)
         except BaseException:
-            self.close()
+            try:
+                self.close()
+            except Exception:
+                pass  # Preserve the construction failure.
             raise
 
     def _service_names(self):
@@ -390,16 +393,30 @@ class UnifiedPipeline:
         if self._closed:
             return
         self._closed = True
+        first_error = None
         for instance in reversed(self._owned):
-            closer = getattr(instance, "close", None)
-            if callable(closer):
-                closer()
+            try:
+                closer = getattr(instance, "close", None)
+                if callable(closer):
+                    closer()
+            except Exception as exc:
+                if first_error is None:
+                    first_error = exc
+        self._owned.clear()
+        if first_error is not None:
+            raise first_error
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+        if exc_type is None:
+            self.close()
+        else:
+            try:
+                self.close()
+            except Exception:
+                pass  # Preserve the exception raised inside the context.
 
 
 def build_unified(config: UnifiedConfiguration, registry: ServiceRegistry | None = None):
