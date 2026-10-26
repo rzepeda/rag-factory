@@ -182,6 +182,41 @@ class UnifiedPipeline:
                 model = spec.parameters.get("embedding_model")
                 if not isinstance(model, str) or not model.strip():
                     raise ValueError(f"Strategy {name} needs embedding_model")
+        # Reject malformed strategy parameters before any provider is constructed.
+        for name, spec in self.config.strategies.items():
+            params = spec.parameters
+            positive = {
+                "max_variants": {"multi_query", "query_expansion"},
+                "candidate_multiplier": {"reranking"},
+                "rank_constant": {"multi_query", "hybrid", "graph_vector_hybrid"},
+                "max_steps": {"agentic"},
+                "max_hops": {"knowledge_graph"},
+                "max_sentences": {"semantic_chunking"},
+            }
+            nonnegative = {
+                "max_rewrites": {"query_refinement"},
+                "max_attempts": {"self_reflective"},
+            }
+            for key, kinds in positive.items():
+                if spec.kind in kinds and key in params and (
+                    type(params[key]) is not int or params[key] <= 0
+                ):
+                    raise ValueError(f"Strategy {name}: {key} must be a positive integer")
+            for key, kinds in nonnegative.items():
+                if spec.kind in kinds and key in params and (
+                    type(params[key]) is not int or params[key] < 0
+                ):
+                    raise ValueError(f"Strategy {name}: {key} must be a nonnegative integer")
+            if spec.kind == "semantic_chunking" and "threshold" in params and (
+                type(params["threshold"]) not in (int, float) or
+                not 0 <= params["threshold"] <= 1
+            ):
+                raise ValueError(f"Strategy {name}: threshold must be between 0 and 1")
+            if spec.kind == "graph_vector_hybrid" and len(params["sources"]) != 2:
+                raise ValueError(f"Strategy {name}: graph_vector_hybrid requires exactly two sources")
+            if spec.kind in {"hybrid", "agentic", "graph_vector_hybrid"}:
+                if len(set(params["sources"])) != len(params["sources"]):
+                    raise ValueError(f"Strategy {name}: duplicate source references")
         # Detect cycles before construction or retrieval.
         for name in self.config.strategies:
             self._validate_references(name, set())
