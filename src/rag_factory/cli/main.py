@@ -11,15 +11,14 @@ from dataclasses import asdict
 from pathlib import Path
 
 from rag_factory.factory.service_registry import default_registry
-from rag_factory.factory.unified import INDEXED, build_unified, validate_unified_configuration
-from rag_factory.factory.unified_config import load_unified_config
+from rag_factory.factory.unified import INDEXED, build_unified
+from rag_factory.factory.unified_config import load_validated_unified_config
 from rag_factory.evaluation.dataset import EvaluationDataset
 from rag_factory.evaluation.experiment import ExperimentConfig, run_experiment
 
 
 def _configuration(path):
-    config = load_unified_config(path)
-    return validate_unified_configuration(config, default_registry())
+    return load_validated_unified_config(path, default_registry())
 
 
 def _payloads(path, configuration):
