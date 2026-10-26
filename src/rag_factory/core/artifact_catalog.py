@@ -23,22 +23,7 @@ def save_manifests(path: str | Path, manifests: dict[str, IndexManifest]) -> Non
         data["capabilities"] = sorted(manifest.capabilities)
         entries[name] = data
     payload = {"format_version": 1, "indexes": entries}
-    target = Path(path)
-    # Never truncate a previous usable catalog on write failure.
-    temporary = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=target.parent,
-            prefix=f".{target.name}.", suffix=".tmp", delete=False,
-        ) as handle:
-            temporary = Path(handle.name)
-            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, target)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
+    _atomic_write_json(path, payload)
 
 
 def load_manifests(path: str | Path) -> dict[str, IndexManifest]:
@@ -63,3 +48,23 @@ def load_manifests(path: str | Path) -> dict[str, IndexManifest]:
             raise ValueError("Artifact capabilities must be a list of nonempty strings")
         manifests[name] = IndexManifest(**{**data, "capabilities": frozenset(caps)})
     return manifests
+
+
+def _atomic_write_json(path: str | Path, payload: dict) -> None:
+    """Write JSON by same-directory replacement without truncating an existing file."""
+    target = Path(path)
+    # Never truncate a previous usable catalog on write failure.
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=target.parent,
+            prefix=f".{target.name}.", suffix=".tmp", delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, target)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
