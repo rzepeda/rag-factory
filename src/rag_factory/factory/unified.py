@@ -356,6 +356,23 @@ class UnifiedPipeline:
         if hierarchies:
             self._hierarchies.update(hierarchies)
 
+    def export_artifact_bundle(self, path) -> None:
+        """Save one atomic metadata snapshot for a separate retrieval execution."""
+        self._require_open()
+        from rag_factory.core.artifact_bundle import save_artifact_bundle
+        save_artifact_bundle(
+            path, self._artifacts,
+            {name: hierarchy for name, hierarchy in self._hierarchies.items()
+             if name in self._artifacts},
+        )
+
+    def attach_artifact_bundle(self, path) -> None:
+        """Load and validate one metadata snapshot against this pipeline's config."""
+        self._require_open()
+        from rag_factory.core.artifact_bundle import load_artifact_bundle
+        manifests, hierarchies = load_artifact_bundle(path)
+        self.attach_artifacts(manifests, hierarchies=hierarchies)
+
     def retrieve(self, name: str, query: str, limit: int = 5) -> list[RetrievalHit]:
         self._require_open()
         if name not in self.config.strategies:
