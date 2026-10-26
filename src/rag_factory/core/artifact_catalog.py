@@ -3,6 +3,8 @@
 No external infrastructure, automatic discovery, or schema migrations.
 """
 import json
+import os
+import tempfile
 from dataclasses import asdict
 from pathlib import Path
 
@@ -21,8 +23,22 @@ def save_manifests(path: str | Path, manifests: dict[str, IndexManifest]) -> Non
         data["capabilities"] = sorted(manifest.capabilities)
         entries[name] = data
     payload = {"format_version": 1, "indexes": entries}
-    Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n",
-                          encoding="utf-8")
+    target = Path(path)
+    # Never truncate a previous usable catalog on write failure.
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=target.parent,
+            prefix=f".{target.name}.", suffix=".tmp", delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, target)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def load_manifests(path: str | Path) -> dict[str, IndexManifest]:
