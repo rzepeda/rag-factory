@@ -32,7 +32,7 @@ def save_manifests(path: str | Path, manifests: dict[str, IndexManifest]) -> Non
             prefix=f".{target.name}.", suffix=".tmp", delete=False,
         ) as handle:
             temporary = Path(handle.name)
-            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\\n")
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, target)
