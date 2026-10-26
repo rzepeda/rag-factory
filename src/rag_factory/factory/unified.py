@@ -136,6 +136,7 @@ class UnifiedPipeline:
         self._instances = {}
         self._owned = []
         self._artifacts: dict[str, IndexManifest] = {}
+        self._failed_indexes: set[str] = set()
         self._hierarchies = {}
         self._closed = False
         self._validate(registry)
@@ -269,6 +270,7 @@ class UnifiedPipeline:
         get = lambda interface: self._service(name, "indexing", interface)
         self._artifacts.pop(name, None)
         self._hierarchies.pop(name, None)
+        self._failed_indexes.add(name)
         if kind == "keyword":
             manifest = KeywordIndexer(get("keyword_store")).index_with_manifest(payload["documents"], artifact_id)
         elif kind == "semantic":
@@ -306,6 +308,7 @@ class UnifiedPipeline:
         if metadata:
             manifest = replace(manifest, **metadata)
         self._artifacts[name] = manifest
+        self._failed_indexes.discard(name)
         return manifest
 
     def attach_artifacts(self, artifacts: Mapping[str, IndexManifest], *, hierarchies=None):
@@ -325,6 +328,8 @@ class UnifiedPipeline:
                     or not isinstance(hierarchy, Hierarchy)):
                     raise ValueError(f"Invalid hierarchy metadata: {h_name}")
         for name, artifact in artifacts.items():
+            if name in self._failed_indexes:
+                raise ValueError(f"Index {name} needs a successful rebuild after a failed write")
             if name not in self.config.strategies or self.config.strategies[name].kind not in INDEXED:
                 raise ValueError(f"Unknown indexed strategy: {name}")
             if not isinstance(artifact, IndexManifest):
@@ -360,6 +365,8 @@ class UnifiedPipeline:
         """Save one atomic metadata snapshot for a separate retrieval execution."""
         self._require_open()
         from rag_factory.core.artifact_bundle import save_artifact_bundle
+        if self._failed_indexes:
+            raise ValueError("Cannot publish artifacts after a failed index write")
         save_artifact_bundle(
             path, self._artifacts,
             {name: hierarchy for name, hierarchy in self._hierarchies.items()
