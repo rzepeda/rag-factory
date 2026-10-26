@@ -103,6 +103,45 @@ Add `--capture-latency` to record variable timing measurements.
 Retrieval-quality scores remain advisory; CI does not fail due to low scores.
 See [EVALUATION_EXPERIMENTS.md](EVALUATION_EXPERIMENTS.md).
 
+## Structured diagnostics (opt-in)
+
+Add `--trace` to `index`, `retrieve` or `evaluate`. Each pipeline
+operation emits one JSON event on **stderr** containing only:
+
+- `stage` (`indexing` or `retrieval`)
+- `strategy` (configured name)
+- `duration_ms` (monotonic elapsed time)
+- `status` (`success` or `error`)
+- `error_type` (exception class name, only on failure)
+
+There is **no query, document text, response, or raw exception message** in
+the trace events. CLI success JSON remains on stdout so it can be parsed
+separately. Nested/composite retrieval calls generate their own events.
+Timing varies by run and is not part of deterministic relevance reports.
+
+Programmatic use accepts `build_unified(config, registry, observer=callback)`.
+Observers receive immutable `OperationEvent` instances. Exceptions raised
+inside an observer are ignored so tracing cannot change retrieval outcomes.
+
+## Explicit opt-in live adapter tests
+
+Live integration testing is **not** part of the Python 3.12 offline core gate.
+Adapters can be checked separately with:
+
+```bash
+RAG_FACTORY_LIVE_INTERFACE=keyword_store \
+RAG_FACTORY_LIVE_FACTORY=my_test_provider:create_keyword_store \
+python -m pytest tests/integration/test_live_provider_contracts.py -m external -v
+```
+
+`RAG_FACTORY_LIVE_FACTORY` uses an importable Python `module:callable`
+defined by the integrator. Without **both** environment variables, the suite
+skips. The core tests verify this skip behavior and opt-in execution against a
+mock, not a real service. Only run it against disposable test data:
+**conformance deliberately writes records**. This suite is not run by the
+core GitHub Actions workflow; no secrets or live endpoints are provisioned
+here.
+
 ## Provider conformance for integrations
 
 New provider implementations can be checked without creating a full RAG
