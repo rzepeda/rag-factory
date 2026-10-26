@@ -312,10 +312,27 @@ class UnifiedPipeline:
         self._require_open()
         from rag_factory.core.index_manifest import IndexRequirement, validate_index_compatibility
         # Transactional metadata update: validate the complete batch first.
+        if not isinstance(artifacts, Mapping):
+            raise ValueError("Artifacts must be a mapping")
+        if hierarchies is not None:
+            from rag_factory.strategies.hierarchical_rag.hierarchy.builder import Hierarchy
+            if not isinstance(hierarchies, Mapping):
+                raise ValueError("Hierarchies must be a mapping")
+            for h_name, hierarchy in hierarchies.items():
+                if (h_name not in self.config.strategies
+                    or self.config.strategies[h_name].kind != "hierarchical"
+                    or (h_name not in artifacts and h_name not in self._artifacts)
+                    or not isinstance(hierarchy, Hierarchy)):
+                    raise ValueError(f"Invalid hierarchy metadata: {h_name}")
         for name, artifact in artifacts.items():
             if name not in self.config.strategies or self.config.strategies[name].kind not in INDEXED:
                 raise ValueError(f"Unknown indexed strategy: {name}")
+            if not isinstance(artifact, IndexManifest):
+                raise ValueError(f"Invalid index manifest for {name}")
             spec = self.config.strategies[name]
+            if ("artifact_id" in spec.parameters
+                and artifact.artifact_id != spec.parameters["artifact_id"]):
+                raise ValueError(f"Strategy {name}: incompatible artifact_id")
             caps = {
                 "keyword": {"keywords"}, "semantic": {"vectors"}, "semantic_chunking": {"vectors"},
                 "contextual": {"keywords", "contextual", "chunks"},
@@ -323,8 +340,13 @@ class UnifiedPipeline:
                 "knowledge_graph": {"graph", "documents"},
                 "late_chunking": {"vectors", "late_chunking"},
             }[spec.kind]
-            req = IndexRequirement(frozenset(caps), schema_version="1",
-                                   embedding_model=spec.parameters.get("embedding_model"))
+            req = IndexRequirement(
+                frozenset(caps), schema_version="1",
+                embedding_model=spec.parameters.get("embedding_model"),
+                embedding_revision=spec.parameters.get("embedding_revision"),
+                resource_locator=spec.parameters.get("resource_locator"),
+                access_scope=spec.parameters.get("access_scope"),
+            )
             validate_index_compatibility(artifact, req)
             if spec.kind == "hierarchical" and (
                 not hierarchies or name not in hierarchies
