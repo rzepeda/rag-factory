@@ -90,8 +90,16 @@ def test_failed_reindex_does_not_leave_stale_manifest_authorizing_search():
         assert "lexical" not in pipeline._artifacts
         with pytest.raises(ValueError, match="Missing index artifact"):
             pipeline.retrieve("lexical", "cat")
+        assert "lexical" in pipeline._failed_indexes
+        with pytest.raises(ValueError, match="successful rebuild"):
+            pipeline.attach_artifacts({"lexical": IndexManifest(
+                "lexical-index", frozenset({"keywords"}), "1"
+            )})
+        with pytest.raises(ValueError, match="Cannot publish"):
+            pipeline.export_artifact_bundle("should-not-exist.json")
         pipeline._instances["store"].fail = False
         pipeline.index("lexical", {"documents": {"c": "cat"}})
+        assert pipeline._failed_indexes == set()
         assert pipeline.retrieve("lexical", "cat")
 
 
