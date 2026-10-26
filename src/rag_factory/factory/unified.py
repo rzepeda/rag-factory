@@ -194,12 +194,12 @@ class UnifiedPipeline:
                 "candidate_multiplier": {"reranking"},
                 "rank_constant": {"multi_query", "hybrid", "graph_vector_hybrid"},
                 "max_steps": {"agentic"},
-                "max_hops": {"knowledge_graph"},
+                "max_attempts": {"self_reflective"},
                 "max_sentences": {"semantic_chunking"},
             }
             nonnegative = {
                 "max_rewrites": {"query_refinement"},
-                "max_attempts": {"self_reflective"},
+                "max_hops": {"knowledge_graph"},
             }
             for key, kinds in positive.items():
                 if spec.kind in kinds and key in params and (
