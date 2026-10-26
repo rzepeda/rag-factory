@@ -7,16 +7,16 @@ is a CI gate.
 
 ## Working example
 
-After \`python -m pip install -e ".[test]"\`, run:
+After `python -m pip install -e ".[test]"`, run:
 
-\`\`\`bash
+```bash
 python examples/offline_evaluation_example.py
-\`\`\`
+```
 
 The example loads two versioned fixtures:
 
-- \`examples/evaluation/animals.v1.json\` — graded question/document judgments.
-- \`examples/evaluation/experiment.v1.json\` — strategy names, k, code revision,
+- `examples/evaluation/animals.v1.json` — graded question/document judgments.
+- `examples/evaluation/experiment.v1.json` — strategy names, k, code revision,
   strategy settings, and provenance metadata.
 
 It indexes documents using the **unified factory**, evaluates keyword and hybrid
@@ -25,7 +25,7 @@ The local toy embedder is **not** a realistic embedding benchmark.
 
 ## Evaluation API
 
-\`\`\`python
+```python
 from dataclasses import replace
 from rag_factory.evaluation.dataset import EvaluationDataset
 from rag_factory.evaluation.experiment import (
@@ -58,11 +58,11 @@ print(comparison.regressions)  # Advisory: does not fail CI.
 
 # An opt-in gate can explicitly fail when metrics regress:
 # comparison.require_no_regressions()
-\`\`\`
+```
 
 The injected callables must yield document IDs in ranked order. Wrapping a
 unified pipeline is straightforward:
-\`lambda query, k: [hit.document_id for hit in pipeline.retrieve("lexical", query, k)]\`.
+`lambda query, k: [hit.document_id for hit in pipeline.retrieve("lexical", query, k)]`.
 Callers own the lifecycle and configuration of those retrievers.
 
 ## Metric definitions
@@ -85,11 +85,11 @@ retrieval score is **not** a proof of factual correctness or answer quality.
 
 ## Reproducibility and provenance
 
-- Dataset JSON has \`format_version: 1\`, a logical name and a version.
-- \`EvaluationDataset.sha256\` fingerprints the canonical dataset contents,
+- Dataset JSON has `format_version: 1`, a logical name and a version.
+- `EvaluationDataset.sha256` fingerprints the canonical dataset contents,
   independent of key order and pretty-printing.
-- \`ExperimentConfig\` records the experiment name, cutoff k, strategy names,
-  explicit \`code_revision\`, strategy settings, and caller-supplied metadata.
+- `ExperimentConfig` records the experiment name, cutoff k, strategy names,
+  explicit `code_revision`, strategy settings, and caller-supplied metadata.
   Configurations also have a versioned JSON save/load API.
 - Runs record both the dataset fingerprint and a configuration fingerprint
   that incorporates the dataset fingerprint. Results include raw ranked IDs
@@ -98,19 +98,19 @@ retrieval score is **not** a proof of factual correctness or answer quality.
   Identical deterministic retrievers and unchanged inputs serialize to the
   same JSON. This does **not** force seeded/deterministic behavior on arbitrary
   LLMs or other external providers.
-- \`capture_latency=True\` records per-query elapsed time in milliseconds.
+- `capture_latency=True` records per-query elapsed time in milliseconds.
   Latency is opt-in because real timings vary across runs; tests may inject a
   monotonic clock. Comparisons report average measured latency separately,
   without treating it as an automatic quality gate.
 - JSON writes use same-directory atomic replacement; a failed replacement
   does not truncate an existing report or dataset.
 
-\`compare_runs\` refuses to compare different dataset versions/fingerprints,
+`compare_runs` refuses to compare different dataset versions/fingerprints,
 cutoff k, strategy sets, or evaluated query sets. It reports all four metric
-deltas and flags drops beyond optional \`tolerated_drops\` thresholds. Neither
-\`run_experiment\` nor \`compare_runs\` raises for low or regressed relevance
-scores by default. Invoke \`require_no_regressions()\` explicitly to opt in
+deltas and flags drops beyond optional `tolerated_drops` thresholds. Neither
+`run_experiment` nor `compare_runs` raises for low or regressed relevance
+scores by default. Invoke `require_no_regressions()` explicitly to opt in
 to CI quality gates.
 
-The pre-existing \`compare_strategies\` and \`EvaluationReport\` APIs remain
+The pre-existing `compare_strategies` and `EvaluationReport` APIs remain
 supported; they now include Precision@K in aggregate experiment results.
