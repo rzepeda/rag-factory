@@ -1,0 +1,12 @@
+{
+  "format_version": 1,
+  "indexes": {
+    "lexical": {
+      "documents": {
+        "cat-document": "Cats purr and are pets",
+        "dog-document": "Dogs bark and are pets",
+        "planet-document": "Planets orbit stars"
+      }
+    }
+  }
+}
