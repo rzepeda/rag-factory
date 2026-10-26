@@ -53,14 +53,25 @@ This roadmap supersedes the earlier algorithm-parity ordering above. Baseline al
 
 ### P0 — Framework correctness and integration
 
-| Requirement | Status | Evidence / remaining work |
+**Completed for the supported offline unified-factory scope (6/6).** This is
+a deterministic, mock/in-memory framework acceptance gate, **not** a claim of
+transactional writes, durable external-provider data, or provider authorization.
+
+| Requirement | Status | Evidence / acceptance |
 | --- | --- | --- |
-| Configuration and dependency validation | **Done for current supported schema** | Pre-construction provider capability, references/cycles, key numeric bounds, source cardinality; broader per-strategy schema coverage can be added later |
-| Unified factory lifecycle and cleanup | **Done** | Reverse-order cleanup, all closers attempted, original construction/context exceptions preserved; failure-injection tests |
-| Standardized indexing and retrieval contracts | **In progress** | RetrievalHit normalization and IndexManifest contracts exist; consistent payload validation and partial-index failure semantics pending |
-| Artifact persistence and compatibility | **In progress** | Atomic versioned manifest and hierarchy catalogs, compatibility validation and cross-execution handoff; durable identity binding and multi-artifact consistency pending |
-| Failure injection and recovery | **In progress** | Provider constructor/close and catalog replace failures covered; index write failures and rollback/fail-closed behavior pending |
-| End-to-end offline acceptance | **In progress** | 12-family mock smoke tests, YAML indexing/retrieval, artifact handoff and hierarchy cross-execution tests; all newer variants and failure paths pending |
+| Configuration and dependency validation | **Done** | Pre-construction capability and reference/cycle validation; supported numeric bounds and required artifact metadata validated; `test_p0_configuration_validation.py` |
+| Unified factory lifecycle and cleanup | **Done** | Reverse-order cleanup, all closers attempted, original constructor/context errors preserved; `test_p0_lifecycle.py` |
+| Standardized indexing and retrieval contracts | **Done** | Preflight validation for all seven indexed kinds, `IndexManifest` returned only on success, typed `RetrievalHit` output with positive integer limits; `test_p0_index_contracts.py` |
+| Artifact persistence and compatibility | **Done (metadata scope)** | Versioned atomic manifest/hierarchy catalogs and single-file artifact bundle; configured artifact identity/scope/locator checks; cross-execution attach and compatibility tests; `test_p0_artifact_bundle.py`, `test_p0_hierarchy_catalog.py` |
+| Failure injection and recovery | **Done (fail-closed scope)** | Constructor/close errors, catalog replacement failures and partial provider writes covered; failed index quarantined until successful rebuild; `test_p0_multistore_failures.py`, `test_p0_index_contracts.py` |
+| End-to-end offline acceptance | **Done** | All 16 supported unified strategy kinds exercised together with deterministic mocks, and a separate-execution artifact handoff tested; `test_p0_all_variants_acceptance.py`, `test_p0_artifact_bundle.py` |
+
+**Boundary:** Providers can leave partially written physical data when they
+raise. P0 prevents publishing/reusing the affected metadata *within the
+current pipeline*; it does not roll back database writes or prove that an
+external index is safe after a process restart. Real service adapters,
+provider-owned transactions, index inspection and authorization belong to
+later integration/production work. Index algorithms are left as baselines.
 
 ### P1 — Experimental infrastructure (next)
 
