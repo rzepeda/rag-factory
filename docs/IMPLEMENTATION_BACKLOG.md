@@ -46,3 +46,29 @@ Implemented new offline components in `dev`:
 Remaining parity enhancements: first-class LLM entity extraction and typed knowledge graphs, self-reflective query refinement, richer agentic planning, HyDE embedding-specific transformations, distinct reranking implementations, production-grade chunk token alignment, fine-tuned model loading, evaluation benchmarks, and external providers. No real model or database services are provisioned.
 
 An additional opt-in `query_refinement` retriever now performs bounded LLM rewriting after empty retrieval, without changing the default `self_reflective` grading algorithm. Existing query-refinement behavior is deliberately a separate composable strategy, not a full Self-RAG reasoning loop.
+
+## Framework-first roadmap (2026-10-26)
+
+This roadmap supersedes the earlier algorithm-parity ordering above. Baseline algorithms remain intentionally unchanged until the experimental infrastructure is established.
+
+### P0 — Framework correctness and integration
+
+| Requirement | Status | Evidence / remaining work |
+| --- | --- | --- |
+| Configuration and dependency validation | **Done for current supported schema** | Pre-construction provider capability, references/cycles, key numeric bounds, source cardinality; broader per-strategy schema coverage can be added later |
+| Unified factory lifecycle and cleanup | **Done** | Reverse-order cleanup, all closers attempted, original construction/context exceptions preserved; failure-injection tests |
+| Standardized indexing and retrieval contracts | **In progress** | RetrievalHit normalization and IndexManifest contracts exist; consistent payload validation and partial-index failure semantics pending |
+| Artifact persistence and compatibility | **In progress** | Atomic versioned manifest and hierarchy catalogs, compatibility validation and cross-execution handoff; durable identity binding and multi-artifact consistency pending |
+| Failure injection and recovery | **In progress** | Provider constructor/close and catalog replace failures covered; index write failures and rollback/fail-closed behavior pending |
+| End-to-end offline acceptance | **In progress** | 12-family mock smoke tests, YAML indexing/retrieval, artifact handoff and hierarchy cross-execution tests; all newer variants and failure paths pending |
+
+### P1 — Experimental infrastructure (next)
+
+| Requirement | Status |
+| --- | --- |
+| Versioned evaluation datasets and graded judgments | Partial baseline |
+| Standardized Recall@K, Precision@K, MRR and nDCG | Partial baseline |
+| Reproducible experiment configuration and persisted results | Partial baseline |
+| Strategy comparisons and regression detection | Pending |
+
+Quality metrics are informational by default, not CI failure thresholds. P2 is developer experience and provider readiness; P3 is algorithm improvements; P4 is production optimization.
