@@ -143,3 +143,40 @@ def test_bad_command_limit_and_unknown_strategy(capsys):
         "--strategy", "no-such-strategy", "--query", "cat",
     )
     assert status == 2 and "Unknown retrieval strategy" in io.err
+
+
+@pytest.mark.parametrize("yaml_text, message", [
+    ("""
+services: {}
+strategies: {hybrid: {kind: hybrid, parameters: {sources: [missing]}}}
+unexpected: value
+""", "Unknown top-level"),
+    ("""
+services:
+  store: {interface: keyword_store, implementation: memory, implmentation: typo}
+strategies: {key: {kind: keyword}}
+""", "Service store: unknown fields"),
+    ("""
+services: {}
+strategies:
+  key: {kind: keyword, retrievel: {keyword_store: store}}
+""", "Strategy key: unknown fields"),
+    ("""
+services:
+  store: {interface: keyword_store, implementation: memory}
+  tok: {interface: tokenizer, implementation: regex}
+strategies:
+  key:
+    kind: keyword
+    indexing: {keyword_store: store, embedding: store}
+    retrieval: {keyword_store: store, tokenizer: tok}
+""", "key / indexing: unknown interface bindings"),
+])
+def test_strict_yaml_field_diagnostics_include_path(tmp_path, capsys, yaml_text, message):
+    file = tmp_path / "bad.yaml"
+    file.write_text(yaml_text)
+    status = main(["validate", "--config", str(file)])
+    io = capsys.readouterr()
+    assert status == 2 and io.out == ""
+    assert str(file) in io.err
+    assert message in io.err
