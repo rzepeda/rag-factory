@@ -1,0 +1,20 @@
+{
+  "format_version": 1,
+  "name": "offline-animals",
+  "version": "1",
+  "judgments": {
+    "What animal purrs?": {
+      "cat-document": 3,
+      "dog-document": 0
+    },
+    "What animal barks?": {
+      "dog-document": 3,
+      "cat-document": 0
+    },
+    "Which animals are pets?": {
+      "cat-document": 2,
+      "dog-document": 2,
+      "planet-document": 0
+    }
+  }
+}
