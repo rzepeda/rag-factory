@@ -109,6 +109,14 @@ class RetrievalHit:
     document_id: str
     text: str | None = None
 
+    def __post_init__(self):
+        if not isinstance(self.document_id, str):
+            raise TypeError("Retrieval document_id must be text")
+        if not self.document_id.strip():
+            raise ValueError("Retrieval document IDs must be nonempty")
+        if self.text is not None and not isinstance(self.text, str):
+            raise TypeError("Retrieval text must be a string or None")
+
 
 def normalize_hits(values: list[Any]) -> list[RetrievalHit]:
     hits = []
@@ -384,8 +392,10 @@ class UnifiedPipeline:
         self._require_open()
         if name not in self.config.strategies:
             raise ValueError(f"Unknown strategy: {name}")
-        if limit <= 0:
-            raise ValueError("limit must be positive")
+        if type(limit) is not int or limit <= 0:
+            raise ValueError("limit must be a positive integer")
+        if not isinstance(query, str):
+            raise TypeError("query must be a string")
         spec = self.config.strategies[name]
         kind = spec.kind
         params = spec.parameters
@@ -452,7 +462,7 @@ class UnifiedPipeline:
                 ref, (lambda q, n, ref=ref: [h.document_id for h in self.retrieve(ref, q, n)])
             ) for ref in params["sources"]))
             result = HybridRetriever(retrieval, params.get("rank_constant", 60)).retrieve(query, limit)
-        return normalize_hits(list(result))
+        return normalize_hits(list(result))[:limit]
 
     def close(self):
         if self._closed:
