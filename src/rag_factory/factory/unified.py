@@ -4,6 +4,8 @@ This is an opt-in unified API. The older keyword/semantic runtime remains
 unchanged while callers migrate. No provider provisioning occurs here.
 """
 from dataclasses import dataclass, field, replace
+from time import perf_counter
+from rag_factory.observability import OperationEvent
 from typing import Any, Mapping, Callable
 from rag_factory.core.index_manifest import IndexManifest
 from rag_factory.core.index_payloads import validate_index_payload
@@ -233,7 +235,12 @@ def validate_unified_configuration(config: UnifiedConfiguration,
 
 
 class UnifiedPipeline:
-    def __init__(self, config: UnifiedConfiguration, registry: ServiceRegistry):
+    def __init__(self, config: UnifiedConfiguration, registry: ServiceRegistry,
+                 *, observer=None, clock=perf_counter):
+        if observer is not None and not callable(observer):
+            raise TypeError("observer must be a callable")
+        self._observer = observer
+        self._clock = clock
         self.config = config
         self._instances = {}
         self._owned = []
@@ -271,7 +278,34 @@ class UnifiedPipeline:
         if self._closed:
             raise RuntimeError("Pipeline is closed")
 
+    def _observe(self, stage, name, operation):
+        if self._observer is None:
+            return operation()
+        started = self._clock()
+        try:
+            result = operation()
+        except BaseException as exc:
+            self._emit_event(OperationEvent(
+                stage, name, max(0.0, (self._clock() - started) * 1000),
+                "error", type(exc).__name__,
+            ))
+            raise
+        self._emit_event(OperationEvent(
+            stage, name, max(0.0, (self._clock() - started) * 1000),
+            "success",
+        ))
+        return result
+
+    def _emit_event(self, event):
+        try:
+            self._observer(event)
+        except Exception:
+            pass  # Observability cannot change an operation's outcome.
+
     def index(self, name: str, payload: Mapping[str, Any]) -> IndexManifest:
+        return self._observe("indexing", name, lambda: self._index(name, payload))
+
+    def _index(self, name: str, payload: Mapping[str, Any]) -> IndexManifest:
         """Index one strategy using explicit payloads; never mutate shared stores automatically."""
         self._require_open()
         if name not in self.config.strategies:
@@ -396,6 +430,9 @@ class UnifiedPipeline:
         self.attach_artifacts(manifests, hierarchies=hierarchies)
 
     def retrieve(self, name: str, query: str, limit: int = 5) -> list[RetrievalHit]:
+        return self._observe("retrieval", name, lambda: self._retrieve(name, query, limit))
+
+    def _retrieve(self, name: str, query: str, limit: int = 5) -> list[RetrievalHit]:
         self._require_open()
         if name not in self.config.strategies:
             raise ValueError(f"Unknown strategy: {name}")
@@ -501,5 +538,9 @@ class UnifiedPipeline:
                 pass  # Preserve the exception raised inside the context.
 
 
-def build_unified(config: UnifiedConfiguration, registry: ServiceRegistry | None = None):
-    return UnifiedPipeline(config, registry if registry is not None else default_registry())
+def build_unified(config: UnifiedConfiguration, registry: ServiceRegistry | None = None,
+                  *, observer=None, clock=perf_counter):
+    return UnifiedPipeline(
+        config, registry if registry is not None else default_registry(),
+        observer=observer, clock=clock,
+    )
