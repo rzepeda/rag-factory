@@ -221,6 +221,14 @@ class UnifiedPipeline:
             if spec.kind in {"hybrid", "agentic", "graph_vector_hybrid"}:
                 if len(set(params["sources"])) != len(params["sources"]):
                     raise ValueError(f"Strategy {name}: duplicate source references")
+        for name, spec in self.config.strategies.items():
+            for key in ("artifact_id", "resource_locator", "access_scope", "embedding_revision"):
+                if key in spec.parameters and (
+                    spec.kind not in INDEXED
+                    or not isinstance(spec.parameters[key], str)
+                    or not spec.parameters[key].strip()
+                ):
+                    raise ValueError(f"Strategy {name}: invalid {key}")
         # Detect cycles before construction or retrieval.
         for name in self.config.strategies:
             self._validate_references(name, set())
@@ -292,6 +300,11 @@ class UnifiedPipeline:
             manifest = LateChunkingIndexer(get("contextual_token_encoder"), get("vector_store"),
                                           spec.parameters["embedding_model"]).index(
                 payload["tokens"], payload["spans"], artifact_id)
+        metadata = {key: spec.parameters[key]
+                    for key in ("resource_locator", "access_scope", "embedding_revision")
+                    if key in spec.parameters}
+        if metadata:
+            manifest = replace(manifest, **metadata)
         self._artifacts[name] = manifest
         return manifest
 
