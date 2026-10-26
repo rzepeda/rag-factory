@@ -1,6 +1,6 @@
-# Unified offline factory (12 strategy families)
+# Unified offline factory (16 strategy kinds)
 
-The opt-in `rag_factory.factory.unified` runtime supports all twelve existing strategy families through a single provider-neutral constructor. This API is intentionally separate from the earlier `factory.runtime` keyword/semantic API while migration and compatibility testing continue.
+The opt-in `rag_factory.factory.unified` runtime supports the twelve baseline strategy families and four additional variants through a single provider-neutral constructor. This API is intentionally separate from the earlier `factory.runtime` keyword/semantic API while migration and compatibility testing continue.
 
 ## Configuration
 
@@ -32,12 +32,13 @@ The example deliberately binds separate **in-memory** stores. Its retrieval resu
 
 Each `retrieve(name, query, limit)` returns `list[RetrievalHit]` where each hit has a required `document_id` and optional `text`. Existing strategy APIs remain unchanged and an adapter normalizes their IDs or `(ID, text)` tuples. The runtime deduplicates per-strategy hits.
 
-## The twelve strategy kinds
+## Supported strategy kinds
 
 | Kind | Index payload | Additional parameters |
 | --- | --- | --- |
 | `keyword` | `documents` | none |
 | `semantic` | `documents` | `embedding_model` |
+| `semantic_chunking` | `documents` | `embedding_model`, optional `threshold`, `max_sentences` |
 | `contextual` | `chunks`, `source_document` | none |
 | `hierarchical` | `parents`, `children`, `child_to_parent` | none |
 | `knowledge_graph` | `documents`, `edges` | `max_hops` |
@@ -48,10 +49,30 @@ Each `retrieve(name, query, limit)` returns `list[RetrievalHit]` where each hit 
 | `self_reflective` | no own index | `source`, optional `max_attempts` |
 | `agentic` | no own index | `sources`, optional `max_steps` |
 | `hybrid` | no own index | `sources`, optional `rank_constant` |
+| `hyde` | no own index | `source` |
+| `query_refinement` | no own index | `source`, optional `max_rewrites` |
+| `graph_vector_hybrid` | no own index | exactly two `sources`, optional `rank_constant` |
 
 Indexed strategies require explicit payload data. The factory does not invent document chunking, entity extraction, or data models. A `hybrid` configuration combines the results of independently indexed sources. Composite references are validated and cycles rejected before service construction.
 
-The `UnifiedPipeline.attach_artifacts()` method validates a batch of index manifests before updating in-memory metadata. For a hierarchical artifact, the external child-to-parent mapping must also be supplied with `hierarchies=`. The `core.artifact_catalog` JSON serialization persists manifests only; it does not persist hierarchy relationships, chunks, or vectors.
+The `UnifiedPipeline.attach_artifacts()` method validates a batch of index manifests before updating in-memory metadata. For a hierarchical artifact, the child-to-parent mapping must also be supplied via `hierarchies=`. The original `core.artifact_catalog` JSON format persists manifests only; `core.hierarchy_catalog` persists relationships separately.
+
+**Preferred cross-execution handoff:** save manifests and hierarchy relationships together in one atomic, versioned JSON metadata bundle:
+
+```python
+# After successfully indexing with the writer pipeline:
+writer.export_artifact_bundle("indexes.bundle.json")
+
+# In a separate pipeline instance with access to the SAME indexed provider data:
+reader.attach_artifact_bundle("indexes.bundle.json")
+hits = reader.retrieve("lexical", "cat")
+```
+
+The bundle stores **metadata only**, never document contents, keyword postings, vectors, or graph data. The reader must have access to the underlying indexed data. Corrupt bundles, incomplete hierarchy relationships and mismatched configured artifact metadata are rejected without a partial metadata update.
+
+Optionally set `parameters.artifact_id`, `parameters.resource_locator`, `parameters.access_scope`, or `parameters.embedding_revision` for an indexed strategy. These values become asserted manifest metadata and are validated again on attachment. They are **not** evidence that a provider implements access control or physically holds matching data.
+
+The unified indexing entry point validates every required payload field before writes. Once a write begins, a provider failure invalidates the strategy's previous attached manifest and prevents old metadata from being reattached or exported in that pipeline until a successful re-index. It does **not** undo partial provider writes, and a new process cannot detect unverified physical store corruption.
 
 ## Boundaries
 
