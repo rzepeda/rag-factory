@@ -1,0 +1,10 @@
+# P2 CLI uses built-in memory stores and a shared tokenizer.
+# Each CLI invocation re-indexes its --payloads JSON; no persistent store is implied.
+services:
+  store: {interface: keyword_store, implementation: memory}
+  tokens: {interface: tokenizer, implementation: regex}
+strategies:
+  lexical:
+    kind: keyword
+    indexing: {keyword_store: store}
+    retrieval: {keyword_store: store, tokenizer: tokens}
