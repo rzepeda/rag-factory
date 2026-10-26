@@ -189,3 +189,39 @@ def test_experiment_runs_over_unified_offline_pipeline(tmp_path):
         assert evaluation.results[0].summary.recall_at_k == 1.0
         evaluation.save(tmp_path / "offline-experiment.json")
         assert ExperimentRun.load(tmp_path / "offline-experiment.json").to_json() == evaluation.to_json()
+
+
+def test_standalone_config_and_checked_in_example(tmp_path):
+    from pathlib import Path
+    import subprocess
+    import sys
+
+    root = Path(__file__).resolve().parents[3]
+    checked_in = root / "examples" / "evaluation"
+    example_dataset = EvaluationDataset.load(checked_in / "animals.v1.json")
+    example_config = ExperimentConfig.load(checked_in / "experiment.v1.json")
+    assert len(example_dataset.judgments) == 3
+    assert example_config.strategies == ("lexical", "fusion")
+    assert example_config.k == 3
+
+    filename = tmp_path / "config.json"
+    example_config.save(filename)
+    assert ExperimentConfig.load(filename) == example_config
+    assert ExperimentConfig.load(filename).to_dict() == example_config.to_dict()
+
+    output = subprocess.run(
+        [sys.executable, str(root / "examples" / "offline_evaluation_example.py")],
+        capture_output=True, text=True, cwd=root, check=True,
+    )
+    assert "Dataset: offline-animals v1" in output.stdout
+    assert "Precision@3" in output.stdout
+
+
+def test_config_format_version_checked(tmp_path):
+    path = tmp_path / "config.json"
+    config("revision").save(path)
+    data = json.loads(path.read_text())
+    data["format_version"] = 2
+    path.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="version"):
+        ExperimentConfig.load(path)
