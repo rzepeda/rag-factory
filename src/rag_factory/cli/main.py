@@ -64,6 +64,8 @@ def build_parser():
         item = sub.add_parser(command)
         item.add_argument("--config", required=True, help="Unified pipeline YAML")
         if command != "validate":
+            item.add_argument("--trace", action="store_true",
+                              help="Emit content-safe stage events as JSON lines to stderr")
             item.add_argument(
                 "--payloads", required=True,
                 help="Versioned JSON index payloads, replayed in this command",
@@ -101,7 +103,13 @@ def execute(args):
         missing = [name for name in experiment.strategies if name not in config.strategies]
         if missing:
             raise ValueError("Experiment references unknown strategies: " + ", ".join(missing))
-    with build_unified(config, default_registry()) as pipeline:
+    observer = None
+    if args.trace:
+        observer = lambda event: print(
+            json.dumps(asdict(event), sort_keys=True, allow_nan=False),
+            file=sys.stderr,
+        )
+    with build_unified(config, default_registry(), observer=observer) as pipeline:
         _index(pipeline, payloads)
         if args.command == "index":
             if args.bundle:
