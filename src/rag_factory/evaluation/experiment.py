@@ -81,6 +81,22 @@ class ExperimentConfig:
             "metadata": dict(self.metadata),
         }
 
+    def save(self, path: str | Path) -> None:
+        """Persist the declared strategy settings separately from run results."""
+        _atomic_write_json(path, {"format_version": 1, **self.to_dict()})
+
+    @classmethod
+    def load(cls, path: str | Path) -> "ExperimentConfig":
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        required = {"format_version", "name", "k", "strategies", "code_revision",
+                    "strategy_settings", "metadata"}
+        if not isinstance(payload, dict) or set(payload) != required:
+            raise ValueError("Invalid experiment configuration format")
+        if type(payload["format_version"]) is not int or payload["format_version"] != 1:
+            raise ValueError("Unsupported experiment configuration version")
+        return cls(**{name: value for name, value in payload.items()
+                      if name != "format_version"})
+
 
 @dataclass(frozen=True)
 class QueryEvaluation:
