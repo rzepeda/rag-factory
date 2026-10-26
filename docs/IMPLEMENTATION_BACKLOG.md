@@ -73,13 +73,37 @@ external index is safe after a process restart. Real service adapters,
 provider-owned transactions, index inspection and authorization belong to
 later integration/production work. Index algorithms are left as baselines.
 
-### P1 — Experimental infrastructure (next)
+### P1 — Experimental infrastructure (current phase)
 
-| Requirement | Status |
-| --- | --- |
-| Versioned evaluation datasets and graded judgments | Partial baseline |
-| Standardized Recall@K, Precision@K, MRR and nDCG | Partial baseline |
-| Reproducible experiment configuration and persisted results | Partial baseline |
-| Strategy comparisons and regression detection | Pending |
+**Completed for the supported offline scope (4/4).** Retrieval-quality metrics
+remain informational by default; only explicit opt-in quality gates can fail
+on a lower score. Implementations of retrieval algorithms remain unchanged.
 
-Quality metrics are informational by default, not CI failure thresholds. P2 is developer experience and provider readiness; P3 is algorithm improvements; P4 is production optimization.
+| Requirement | Status | Evidence / acceptance |
+| --- | --- | --- |
+| Versioned datasets and graded relevance judgments | **Done** | Immutable snapshots, strict versioned JSON load/save, content SHA-256, checked-in fixture; `evaluation/dataset.py`, `test_p1_metrics_and_datasets.py` |
+| Recall@K, Precision@K, MRR@K, nDCG@K | **Done** | Shared top-k/deduplication/grade semantics, per-query and aggregate scores, graded nDCG; `evaluation/metrics.py`, `evaluation/runner.py`, `test_p1_metrics_and_datasets.py` |
+| Reproducible experiment configurations, execution, artifacts and metadata | **Done** | Versioned standalone config, source revision and strategy settings, dataset/config fingerprints, deterministic per-query report JSON, opt-in latency, offline unified-factory example; `evaluation/experiment.py`, `test_p1_experiment_workflow.py` |
+| Strategy comparison and cross-version regression detection | **Done** | Compatible dataset/query/k checks, per-metric deltas, tolerance thresholds, advisory regressions and explicit opt-in gates; `evaluation/comparison.py`, `test_p1_experiment_workflow.py` |
+
+See `docs/EVALUATION_EXPERIMENTS.md` and run
+`python examples/offline_evaluation_example.py`.
+This is an **offline experimental harness**, not evidence that a model, provider,
+or retrieval strategy is production-grade. Real-run nondeterminism, statistical
+significance/confidence intervals, and provider costs are future extensions,
+not P1 completion prerequisites.
+
+### P2 — Developer experience and integration readiness (next phase)
+
+| Requirement | Status | Next acceptance criteria |
+| --- | --- | --- |
+| Runnable offline index → retrieve → evaluate walkthrough | **Done (Python example)** | `examples/offline_evaluation_example.py` uses unified factory, saved fixture dataset/config and real metrics; optionally extend to YAML-driven workflow |
+| YAML configuration guides, examples and schema diagnostics | **Partial** | Publish validated examples, clear invalid-config errors and stage-binding documentation |
+| Unified CLI: validate / index / retrieve / evaluate | **Pending** | Offline commands with documented arguments, reproducible output and errors |
+| Provider conformance test harness | **Partial** | Turn existing isolated mock contract checks into reusable adapter suites for new providers |
+| Separate offline and opt-in live integration testing | **Partial** | Dedicated pytest groups/CI boundaries and provider setup instructions; never require real backends for core CI |
+| Structured observability and failure diagnostics | **Pending** | Stage/strategy identifiers, timing and error attribution without leaking document content |
+| Extension guides for strategies and providers | **Pending** | Practical registration and lifecycle examples, contract checklists and compatibility tests |
+
+P3 remains strategy algorithm improvements measured against retained P1
+baselines. P4 remains production throughput, cost and scaling optimization.
