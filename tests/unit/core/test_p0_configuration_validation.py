@@ -1,7 +1,8 @@
 """P0: reject malformed strategies before constructing external providers."""
 import pytest
 from rag_factory.factory.unified import StrategySpec, UnifiedConfiguration, build_unified
-from rag_factory.factory.service_registry import ServiceRegistry
+from rag_factory.factory.service_registry import ServiceRegistry, ServiceConfig
+from rag_factory.core.service_contracts import ProviderDescriptor
 
 @pytest.mark.parametrize("kind,parameters,error", [
     ("hybrid", {"sources": ["leaf", "leaf"]}, "duplicate"),
@@ -11,13 +12,16 @@ from rag_factory.factory.service_registry import ServiceRegistry
     ("hybrid", {"sources": ["leaf"], "rank_constant": True}, "rank_constant"),
 ])
 def test_invalid_composite_rejected_without_provider_creation(kind, parameters, error):
-    config = UnifiedConfiguration({}, {
+    registry = ServiceRegistry()
+    registry.register(ProviderDescriptor("llm", "mock", frozenset({"generate"})),
+                      lambda: (_ for _ in ()).throw(AssertionError("provider constructed")))
+    config = UnifiedConfiguration({"llm": ServiceConfig("llm", "mock")}, {
         "leaf": StrategySpec("hybrid", parameters={"sources": ["other"]}),
         "other": StrategySpec("hybrid", parameters={"sources": ["leaf"]}),
-        "root": StrategySpec(kind, parameters=parameters),
+        "root": StrategySpec(kind, retrieval={"llm": "llm"} if kind == "agentic" else {}, parameters=parameters),
     })
     with pytest.raises(ValueError, match=error):
-        build_unified(config, ServiceRegistry())
+        build_unified(config, registry)
 
 def test_bad_semantic_threshold_rejected_before_providers():
     from rag_factory.core.service_contracts import ProviderDescriptor
