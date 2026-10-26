@@ -1,0 +1,18 @@
+{
+  "format_version": 1,
+  "name": "offline-cli-keyword",
+  "k": 3,
+  "strategies": [
+    "lexical"
+  ],
+  "code_revision": "offline-baseline-v1",
+  "strategy_settings": {
+    "lexical": {
+      "kind": "keyword",
+      "provider": "memory"
+    }
+  },
+  "metadata": {
+    "scenario": "P2 offline CLI walkthrough"
+  }
+}
