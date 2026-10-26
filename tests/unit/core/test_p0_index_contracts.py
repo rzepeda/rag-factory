@@ -161,3 +161,27 @@ def test_reject_invalid_hierarchy_handoff_atomically():
         pipeline.attach_artifacts({"tree": artifact},
                                   hierarchies={"tree": Hierarchy({"c": "p"})})
         assert pipeline._hierarchies["tree"].parent_of("c") == "p"
+
+
+def test_retrieval_rejects_bad_hit_shapes_and_limits():
+    from rag_factory.factory.unified import RetrievalHit, normalize_hits
+
+    with pytest.raises(TypeError, match="document_id"):
+        RetrievalHit(42)
+    with pytest.raises(TypeError, match="text"):
+        RetrievalHit("a", 42)
+    with pytest.raises(ValueError, match="nonempty"):
+        RetrievalHit(" ")
+    with pytest.raises(TypeError):
+        normalize_hits([object()])
+
+    registry, services = setup()
+    with build_unified(UnifiedConfiguration(services, {
+        "lexical": all_indexed()["keyword"],
+    }), registry) as pipeline:
+        pipeline.index("lexical", {"documents": {"a": "cat"}})
+        for limit in (True, 1.5, 0, -1):
+            with pytest.raises(ValueError, match="positive integer"):
+                pipeline.retrieve("lexical", "cat", limit=limit)
+        with pytest.raises(TypeError, match="query"):
+            pipeline.retrieve("lexical", 42)
