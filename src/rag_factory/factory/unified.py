@@ -156,78 +156,78 @@ def validate_unified_configuration(config: UnifiedConfiguration,
         for ref in refs:
             validate_references(ref, visiting | {name})
 
-        used_names = {
-            binding.get(req.interface)
-            for spec in config.strategies.values()
-            for stage, binding in (("indexing", spec.indexing), ("retrieval", spec.retrieval))
-            for req in REQUIRES[spec.kind][stage]
+    used_names = {
+        binding.get(req.interface)
+        for spec in config.strategies.values()
+        for stage, binding in (("indexing", spec.indexing), ("retrieval", spec.retrieval))
+        for req in REQUIRES[spec.kind][stage]
+    }
+    descriptors = {
+        name: registry.descriptor(config.services[name])
+        for name in used_names if name is not None and name in config.services
+    }
+    for name, spec in config.strategies.items():
+        for stage, bindings in (("indexing", spec.indexing), ("retrieval", spec.retrieval)):
+            validate_service_bindings(REQUIRES[spec.kind][stage], bindings, descriptors)
+        for option in ("source",):
+            if spec.kind in REFERENCED:
+                check_reference(name, spec.parameters.get(option))
+        if spec.kind in {"hybrid", "agentic", "graph_vector_hybrid"}:
+            names = spec.parameters.get("sources")
+            if not isinstance(names, list) or not names:
+                raise ValueError(f"Strategy {name} needs nonempty sources")
+            for source in names:
+                check_reference(name, source)
+        if spec.kind in {"semantic", "late_chunking", "semantic_chunking"}:
+            model = spec.parameters.get("embedding_model")
+            if not isinstance(model, str) or not model.strip():
+                raise ValueError(f"Strategy {name} needs embedding_model")
+    # Reject malformed strategy parameters before any provider is constructed.
+    for name, spec in config.strategies.items():
+        params = spec.parameters
+        positive = {
+            "max_variants": {"multi_query", "query_expansion"},
+            "candidate_multiplier": {"reranking"},
+            "rank_constant": {"multi_query", "hybrid", "graph_vector_hybrid"},
+            "max_steps": {"agentic"},
+            "max_attempts": {"self_reflective"},
+            "max_sentences": {"semantic_chunking"},
         }
-        descriptors = {
-            name: registry.descriptor(config.services[name])
-            for name in used_names if name is not None and name in config.services
+        nonnegative = {
+            "max_rewrites": {"query_refinement"},
+            "max_hops": {"knowledge_graph"},
         }
-        for name, spec in config.strategies.items():
-            for stage, bindings in (("indexing", spec.indexing), ("retrieval", spec.retrieval)):
-                validate_service_bindings(REQUIRES[spec.kind][stage], bindings, descriptors)
-            for option in ("source",):
-                if spec.kind in REFERENCED:
-                    check_reference(name, spec.parameters.get(option))
-            if spec.kind in {"hybrid", "agentic", "graph_vector_hybrid"}:
-                names = spec.parameters.get("sources")
-                if not isinstance(names, list) or not names:
-                    raise ValueError(f"Strategy {name} needs nonempty sources")
-                for source in names:
-                    check_reference(name, source)
-            if spec.kind in {"semantic", "late_chunking", "semantic_chunking"}:
-                model = spec.parameters.get("embedding_model")
-                if not isinstance(model, str) or not model.strip():
-                    raise ValueError(f"Strategy {name} needs embedding_model")
-        # Reject malformed strategy parameters before any provider is constructed.
-        for name, spec in config.strategies.items():
-            params = spec.parameters
-            positive = {
-                "max_variants": {"multi_query", "query_expansion"},
-                "candidate_multiplier": {"reranking"},
-                "rank_constant": {"multi_query", "hybrid", "graph_vector_hybrid"},
-                "max_steps": {"agentic"},
-                "max_attempts": {"self_reflective"},
-                "max_sentences": {"semantic_chunking"},
-            }
-            nonnegative = {
-                "max_rewrites": {"query_refinement"},
-                "max_hops": {"knowledge_graph"},
-            }
-            for key, kinds in positive.items():
-                if spec.kind in kinds and key in params and (
-                    type(params[key]) is not int or params[key] <= 0
-                ):
-                    raise ValueError(f"Strategy {name}: {key} must be a positive integer")
-            for key, kinds in nonnegative.items():
-                if spec.kind in kinds and key in params and (
-                    type(params[key]) is not int or params[key] < 0
-                ):
-                    raise ValueError(f"Strategy {name}: {key} must be a nonnegative integer")
-            if spec.kind == "semantic_chunking" and "threshold" in params and (
-                type(params["threshold"]) not in (int, float) or
-                not 0 <= params["threshold"] <= 1
+        for key, kinds in positive.items():
+            if spec.kind in kinds and key in params and (
+                type(params[key]) is not int or params[key] <= 0
             ):
-                raise ValueError(f"Strategy {name}: threshold must be between 0 and 1")
-            if spec.kind == "graph_vector_hybrid" and len(params["sources"]) != 2:
-                raise ValueError(f"Strategy {name}: graph_vector_hybrid requires exactly two sources")
-            if spec.kind in {"hybrid", "agentic", "graph_vector_hybrid"}:
-                if len(set(params["sources"])) != len(params["sources"]):
-                    raise ValueError(f"Strategy {name}: duplicate source references")
-        for name, spec in config.strategies.items():
-            for key in ("artifact_id", "resource_locator", "access_scope", "embedding_revision"):
-                if key in spec.parameters and (
-                    spec.kind not in INDEXED
-                    or not isinstance(spec.parameters[key], str)
-                    or not spec.parameters[key].strip()
-                ):
-                    raise ValueError(f"Strategy {name}: invalid {key}")
-        # Detect cycles before construction or retrieval.
-        for name in config.strategies:
-            validate_references(name, set())
+                raise ValueError(f"Strategy {name}: {key} must be a positive integer")
+        for key, kinds in nonnegative.items():
+            if spec.kind in kinds and key in params and (
+                type(params[key]) is not int or params[key] < 0
+            ):
+                raise ValueError(f"Strategy {name}: {key} must be a nonnegative integer")
+        if spec.kind == "semantic_chunking" and "threshold" in params and (
+            type(params["threshold"]) not in (int, float) or
+            not 0 <= params["threshold"] <= 1
+        ):
+            raise ValueError(f"Strategy {name}: threshold must be between 0 and 1")
+        if spec.kind == "graph_vector_hybrid" and len(params["sources"]) != 2:
+            raise ValueError(f"Strategy {name}: graph_vector_hybrid requires exactly two sources")
+        if spec.kind in {"hybrid", "agentic", "graph_vector_hybrid"}:
+            if len(set(params["sources"])) != len(params["sources"]):
+                raise ValueError(f"Strategy {name}: duplicate source references")
+    for name, spec in config.strategies.items():
+        for key in ("artifact_id", "resource_locator", "access_scope", "embedding_revision"):
+            if key in spec.parameters and (
+                spec.kind not in INDEXED
+                or not isinstance(spec.parameters[key], str)
+                or not spec.parameters[key].strip()
+            ):
+                raise ValueError(f"Strategy {name}: invalid {key}")
+    # Detect cycles before construction or retrieval.
+    for name in config.strategies:
+        validate_references(name, set())
 
     return config
 
